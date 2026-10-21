@@ -1,0 +1,264 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
+<title id="title">My AI Office 공용 업무층 치수 배치안</title>
+<desc id="desc">40미터 x 24미터의 한 층에 다섯 업무 구역과 36개 작업 위치를 둔 치수 개념도.</desc>
+<defs><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#dfe6db" stroke-width="1"/></pattern>
+<style>
+.bg{fill:#f7f7f0} .title{font:700 34px sans-serif;fill:#24352d} .sub{font:16px sans-serif;fill:#617166} .zone{stroke:#879588;stroke-width:2} .zoneName{font:700 23px sans-serif;fill:#29382e} .zoneNote{font:14px sans-serif;fill:#536257} .desk{fill:#d8c5a4;stroke:#9b896d;stroke-width:1.5} .monitor{fill:#52675f} .tag{font:10px sans-serif;fill:white;font-weight:700} .route{fill:none;stroke:#65846b;stroke-width:5;stroke-dasharray:3 14;stroke-linecap:round} .dimension{stroke:#64776b;stroke-width:2} .tick{stroke:#64776b;stroke-width:2} .dimlabel{font:700 14px sans-serif;fill:#506254} .note{font:15px sans-serif;fill:#46564b} .small{font:13px sans-serif;fill:#617166} .north{font:700 16px sans-serif;fill:#3e5948}
+</style></defs>
+<rect width="100%" height="100%" class="bg"/>
+<text x="70" y="62" class="title" text-anchor="start">MY AI OFFICE · 공용 업무층 치수 배치안</text>
+<text x="70" y="94" class="sub" text-anchor="start">프로젝트별 층 없이 공통 업무 구역에 세션을 배치하는 1차 좌표안</text>
+
+<rect x="120" y="155" width="1280" height="768" rx="24" fill="#fffdf7" stroke="#718373" stroke-width="4"/>
+<rect x="152.0" y="187.0" width="384.0" height="288.0" rx="14" fill="#f3ead7" stroke="#9eaa9a" stroke-width="2"/>
+<rect x="536.0" y="187.0" width="480.0" height="288.0" rx="14" fill="#e4ecdf" stroke="#9eaa9a" stroke-width="2"/>
+<rect x="1016.0" y="187.0" width="352.0" height="288.0" rx="14" fill="#e3eaf0" stroke="#9eaa9a" stroke-width="2"/>
+<rect x="152.0" y="603.0" width="512.0" height="288.0" rx="14" fill="#eee7f3" stroke="#9eaa9a" stroke-width="2"/>
+<rect x="664.0" y="603.0" width="704.0" height="288.0" rx="14" fill="#e9eee5" stroke="#9eaa9a" stroke-width="2"/>
+<rect x="152" y="475" width="1216" height="128" fill="#ecefe8" stroke="#bdc8ba" stroke-width="2"/>
+<rect x="120" y="155" width="1280" height="768" rx="24" fill="url(#grid)" opacity=".65"/>
+<rect x="354.0" y="471" width="76" height="8" fill="#fffdf7"/>
+<rect x="722" y="471" width="76" height="8" fill="#fffdf7"/>
+<rect x="1202" y="471" width="76" height="8" fill="#fffdf7"/>
+<rect x="370" y="599" width="76" height="8" fill="#fffdf7"/>
+<rect x="1010" y="599" width="76" height="8" fill="#fffdf7"/>
+<text x="206" y="223" class="zoneName" text-anchor="start">자료 탐색</text>
+<text x="206" y="247" class="zoneNote" text-anchor="start">자료실 3석 · 정보검색 3석</text>
+<text x="590" y="223" class="zoneName" text-anchor="start">개발</text>
+<text x="590" y="247" class="zoneNote" text-anchor="start">코드 작성 · 파일 수정 · 12석</text>
+<text x="1070" y="223" class="zoneName" text-anchor="start">실행 · 서버</text>
+<text x="1070" y="247" class="zoneNote" text-anchor="start">터미널 · 빌드 · 도구 실행 · 6석</text>
+<text x="206" y="639" class="zoneName" text-anchor="start">검토 · 회의</text>
+<text x="206" y="663" class="zoneNote" text-anchor="start">계획 · 결과 검토 · 에이전트 협업 · 6석</text>
+<text x="718" y="639" class="zoneName" text-anchor="start">요청 접수 · 휴식</text>
+<text x="718" y="663" class="zoneNote" text-anchor="start">새 요청 · 대기 직원 · 6석</text>
+<g transform="translate(248.0 315.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#c08d64" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#c08d64"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(344.0 315.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#c08d64" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#c08d64"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(440.0 315.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#c08d64" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#c08d64"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(248.0 411.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#c08d64" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#c08d64"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(344.0 411.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#c08d64" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#c08d64"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(440.0 411.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#c08d64" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#c08d64"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(584.0 276.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(657.6 276.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(731.2 276.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(804.8 276.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(878.4 276.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(952.0 276.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(584.0 372.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(657.6 372.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(731.2 372.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(804.8 372.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(878.4 372.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(952.0 372.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#719277" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#719277"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(1080.0 283.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#6e8ea8" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#6e8ea8"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(1192.0 283.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#6e8ea8" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#6e8ea8"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(1304.0 283.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#6e8ea8" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#6e8ea8"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(1080.0 395.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#6e8ea8" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#6e8ea8"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(1192.0 395.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#6e8ea8" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#6e8ea8"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(1304.0 395.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#6e8ea8" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#6e8ea8"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<rect x="248" y="702.2" width="320" height="51.2" rx="18" fill="#d9c9e5" stroke="#9e8aaa" stroke-width="2"/>
+<g transform="translate(280.0 667.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#9a82aa" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#9a82aa"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(280.0 798.2)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#9a82aa" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#9a82aa"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(376.0 667.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#9a82aa" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#9a82aa"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(376.0 798.2)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#9a82aa" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#9a82aa"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(472.0 667.0)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#9a82aa" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#9a82aa"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(472.0 798.2)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#9a82aa" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#9a82aa"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(792.0 686.2)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#809778" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#809778"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(920.0 686.2)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#809778" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#809778"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(1048.0 686.2)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#809778" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#809778"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<g transform="translate(792.0 804.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#809778" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#809778"/><text x="30" y="-17" class="tag" text-anchor="middle">P-02</text>
+    </g>
+<g transform="translate(920.0 804.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#809778" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#809778"/><text x="30" y="-17" class="tag" text-anchor="middle">P-03</text>
+    </g>
+<g transform="translate(1048.0 804.6)">
+      <rect x="-26" y="-15" width="52" height="30" rx="5" class="desk"/>
+      <rect x="-10" y="-20" width="20" height="8" rx="2" class="monitor"/>
+      <circle cx="0" cy="27" r="10" fill="#809778" stroke="#fffdf7" stroke-width="3"/>
+      <rect x="13" y="-29" width="34" height="16" rx="7" fill="#809778"/><text x="30" y="-17" class="tag" text-anchor="middle">P-01</text>
+    </g>
+<path class="route" d="M184 539H1336 M392.0 539V475 M760 539V475 M1240 539V475 M408 539V603 M1048 539V603"/>
+<text x="760" y="500.6" class="small" text-anchor="middle">4m 중앙 통로</text>
+<path d="M120 120h1280" class="dimension"/><path d="M120 113v14 M1400 113v14" class="tick"/><text x="760" y="110" class="dimlabel" text-anchor="middle">40m</text>
+<path d="M1438 155v768" class="dimension"/><path d="M1431 155h14 M1431 923h14" class="tick"/><text x="1453" y="539" class="dimlabel" text-anchor="start">24m</text>
+<path d="M1470 215v-48m0 0-12 18m12-18 12 18" stroke="#526b58" stroke-width="3" fill="none"/>
+<text x="1470" y="235" class="north" text-anchor="middle">N</text>
+<circle cx="106" cy="965" r="9" fill="#719277"/><text x="124" y="970" class="note">직원/좌석 위치</text>
+<rect x="300" y="956" width="38" height="18" rx="5" class="desk"/><text x="350" y="970" class="note">책상</text>
+<path d="M465 965h60" class="route"/><text x="540" y="970" class="note">주 통행 동선</text>
+<text x="760" y="970" class="note" text-anchor="start">좌석 목표: 6 + 12 + 6 + 6 + 6 = 36명</text>
+<text x="70" y="1030" class="small" text-anchor="start">가정: 직원 간 중심 간격은 최소 약 1.5m, 주요 통로 4m, 각 구역 출입구 폭 2.4m. 가구·동선 충돌 검토 전 개념 좌표입니다.</text>
+<text x="70" y="1055" class="small" text-anchor="start">좌표 원점은 층 중앙 (0, 0), 단위는 m. 실측 도면이 아니며 3D 경로 검증 뒤 조정합니다.</text>
+</svg>

@@ -1,0 +1,23 @@
+# Local data and generated releases
+/data/
+/dist/
+
+# Bundled platform runtimes are large; provide them locally when building a release ZIP.
+/runtime/node/
+
+# Local editor and operating-system files
+/.idea/
+.DS_Store
+
+# Private configuration and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Dependency and build output
+/node_modules/
+/coverage/
+
+# Screenshots may contain local project names or session details
+/docs/design/previews/

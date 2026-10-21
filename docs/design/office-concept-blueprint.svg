@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+<title id="title">My AI Office 공용 업무층 개념 청사진</title>
+<desc id="desc">프로젝트별 층 대신 하나의 넓은 층을 업무 프로세스별 구역으로 나누고, 여러 프로젝트 직원이 함께 일하는 개념 평면도.</desc>
+<defs>
+  <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#e4e8de" stroke-width="1"/></pattern>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#24352d" flood-opacity=".12"/></filter>
+  <style>
+    .title{font:700 34px sans-serif;fill:#24352d}.sub{font:16px sans-serif;fill:#617166}.zone{stroke:#869587;stroke-width:2}.ztitle{font:700 23px sans-serif;fill:#29382e}.zsub{font:15px sans-serif;fill:#536257}.furn{fill:#fffdf7;stroke:#b2bcae;stroke-width:2}.desk{fill:#d8c5a4;stroke:#9b896d;stroke-width:1.5}.screen{fill:#52675f}.seat{fill:#879987}.route{fill:none;stroke:#607e68;stroke-width:6;stroke-dasharray:3 14;stroke-linecap:round;opacity:.8}.person{stroke:#fff;stroke-width:3}.tag{font:12px sans-serif;fill:#fff;font-weight:700}.note{font:14px sans-serif;fill:#46564b}
+  </style>
+</defs>
+<rect width="1600" height="1000" fill="#f6f6ef"/>
+<text x="70" y="72" class="title">MY AI OFFICE · 공용 업무층</text>
+<text x="70" y="105" class="sub">프로젝트는 이름표로 구분하고, 업무가 비슷한 직원은 공용 구역에서 함께 일합니다.</text>
+<g filter="url(#shadow)"><rect x="75" y="145" width="1450" height="760" rx="34" fill="#fffdf7" stroke="#d5dccf" stroke-width="3"/></g>
+<rect x="95" y="165" width="1410" height="720" rx="24" fill="url(#grid)"/>
+<!-- zones -->
+<rect x="115" y="185" width="370" height="265" rx="22" fill="#f4edda" class="zone"/>
+<rect x="505" y="185" width="610" height="265" rx="22" fill="#e4ecdf" class="zone"/>
+<rect x="1135" y="185" width="350" height="265" rx="22" fill="#e3eaf0" class="zone"/>
+<rect x="115" y="470" width="470" height="240" rx="22" fill="#eee7f3" class="zone"/>
+<rect x="1035" y="470" width="450" height="240" rx="22" fill="#f2e8ed" class="zone"/>
+<rect x="115" y="730" width="1370" height="135" rx="22" fill="#e9eee5" class="zone"/>
+<!-- labels -->
+<text x="145" y="225" class="ztitle">자료 탐색</text><text x="145" y="251" class="zsub">파일 읽기 · 웹 검색 · 도구 사용</text>
+<text x="535" y="225" class="ztitle">개발</text><text x="535" y="251" class="zsub">코드 작성 · 수정 · 구현</text>
+<text x="1165" y="225" class="ztitle">실행 · 서버</text><text x="1165" y="251" class="zsub">빌드 · 명령 · 도구 작업</text>
+<text x="145" y="510" class="ztitle">검토 · 회의</text><text x="145" y="536" class="zsub">결과 확인 · 계획 · 협업</text>
+<text x="1065" y="510" class="ztitle">휴식 · 대기</text><text x="1065" y="536" class="zsub">유휴 직원과 다음 지시 대기</text>
+<text x="145" y="772" class="ztitle">공용 통로</text><text x="145" y="800" class="zsub">업무 구역 간 이동 · 열린 시야</text>
+<!-- shelves -->
+<g class="furn"><rect x="145" y="278" width="45" height="125" rx="5"/><rect x="201" y="278" width="45" height="125" rx="5"/><rect x="257" y="278" width="45" height="125" rx="5"/></g>
+<g fill="#8fa17f"><path d="M150 305h35v8h-35zm0 28h35v8h-35zm0 28h35v8h-35zm56-56h35v8h-35zm0 28h35v8h-35zm0 28h35v8h-35zm56-56h35v8h-35zm0 28h35v8h-35zm0 28h35v8h-35z"/></g>
+<!-- desks function -->
+<g>
+<g transform="translate(335 292)"><rect class="desk" width="105" height="38" rx="5"/><rect class="screen" x="38" y="-25" width="32" height="21" rx="3"/><circle class="seat" cx="52" cy="57" r="12"/></g>
+<g transform="translate(335 355)"><rect class="desk" width="105" height="38" rx="5"/><rect class="screen" x="38" y="-25" width="32" height="21" rx="3"/><circle class="seat" cx="52" cy="57" r="12"/></g>
+<g transform="translate(550 285)"><rect class="desk" width="150" height="44" rx="5"/><rect class="screen" x="25" y="-26" width="31" height="22" rx="3"/><rect class="screen" x="94" y="-26" width="31" height="22" rx="3"/><circle class="seat" cx="38" cy="61" r="12"/><circle class="seat" cx="112" cy="61" r="12"/></g>
+<g transform="translate(735 285)"><rect class="desk" width="150" height="44" rx="5"/><rect class="screen" x="25" y="-26" width="31" height="22" rx="3"/><rect class="screen" x="94" y="-26" width="31" height="22" rx="3"/><circle class="seat" cx="38" cy="61" r="12"/><circle class="seat" cx="112" cy="61" r="12"/></g>
+<g transform="translate(920 285)"><rect class="desk" width="150" height="44" rx="5"/><rect class="screen" x="25" y="-26" width="31" height="22" rx="3"/><rect class="screen" x="94" y="-26" width="31" height="22" rx="3"/><circle class="seat" cx="38" cy="61" r="12"/><circle class="seat" cx="112" cy="61" r="12"/></g>
+<g transform="translate(550 365)"><rect class="desk" width="150" height="40" rx="5"/><rect class="screen" x="25" y="-25" width="31" height="21" rx="3"/><rect class="screen" x="94" y="-25" width="31" height="21" rx="3"/><circle class="seat" cx="38" cy="57" r="11"/><circle class="seat" cx="112" cy="57" r="11"/></g>
+<g transform="translate(735 365)"><rect class="desk" width="150" height="40" rx="5"/><rect class="screen" x="25" y="-25" width="31" height="21" rx="3"/><rect class="screen" x="94" y="-25" width="31" height="21" rx="3"/><circle class="seat" cx="38" cy="57" r="11"/><circle class="seat" cx="112" cy="57" r="11"/></g>
+<g transform="translate(920 365)"><rect class="desk" width="150" height="40" rx="5"/><rect class="screen" x="25" y="-25" width="31" height="21" rx="3"/><rect class="screen" x="94" y="-25" width="31" height="21" rx="3"/><circle class="seat" cx="38" cy="57" r="11"/><circle class="seat" cx="112" cy="57" r="11"/></g>
+</g>
+<!-- server racks -->
+<g fill="#52616a" stroke="#364950" stroke-width="2"><rect x="1170" y="285" width="66" height="125" rx="6"/><rect x="1248" y="285" width="66" height="125" rx="6"/><rect x="1326" y="285" width="66" height="125" rx="6"/><rect x="1404" y="285" width="54" height="125" rx="6"/></g>
+<g fill="#a8d3bf"><circle cx="1186" cy="306" r="4"/><circle cx="1186" cy="326" r="4"/><circle cx="1264" cy="306" r="4"/><circle cx="1264" cy="326" r="4"/><circle cx="1342" cy="306" r="4"/><circle cx="1342" cy="326" r="4"/><circle cx="1420" cy="306" r="4"/><circle cx="1420" cy="326" r="4"/></g>
+<!-- meeting table -->
+<rect x="165" y="585" width="345" height="74" rx="28" fill="#d9c9e5" stroke="#9e8aaa" stroke-width="2"/>
+<g fill="#879987"><circle cx="205" cy="570" r="12"/><circle cx="295" cy="570" r="12"/><circle cx="385" cy="570" r="12"/><circle cx="475" cy="570" r="12"/><circle cx="205" cy="675" r="12"/><circle cx="295" cy="675" r="12"/><circle cx="385" cy="675" r="12"/><circle cx="475" cy="675" r="12"/></g>
+<rect x="590" y="490" width="390" height="190" rx="14" fill="#fffdf7" stroke="#c9d2c5" stroke-width="2" stroke-dasharray="8 8"/>
+<text x="620" y="535" class="ztitle" style="font-size:19px">선택 공간 확대 영역</text><text x="620" y="565" class="zsub">방이나 직원을 누르면 카메라가 이동</text>
+<text x="620" y="603" class="note">전체 보기에서는 층 전체의 동시 작업을 확인</text><text x="620" y="632" class="note">상세 보기에서는 이름표와 작업 상태를 확대</text>
+<!-- lounge sofas -->
+<g fill="#d7e0cf" stroke="#91a28e" stroke-width="2"><rect x="1080" y="565" width="155" height="60" rx="20"/><rect x="1270" y="565" width="155" height="60" rx="20"/><rect x="1168" y="644" width="155" height="45" rx="18"/></g>
+<g fill="#c7b5cc"><circle cx="1260" cy="610" r="23"/><circle cx="1060" cy="654" r="19"/><circle cx="1438" cy="655" r="19"/></g>
+<!-- route -->
+<path class="route" d="M170 810 H1410 M310 750 V690 M790 750 V455 M1310 750 V455"/>
+<!-- sample staff and project tags -->
+<g><circle class="person" cx="363" cy="279" r="13" fill="#d88f70"/><rect x="376" y="263" width="44" height="20" rx="8" fill="#b76d56"/><text x="382" y="277" class="tag">WEB</text>
+<circle class="person" cx="572" cy="273" r="13" fill="#7392b5"/><rect x="585" y="257" width="42" height="20" rx="8" fill="#58799e"/><text x="591" y="271" class="tag">APP</text>
+<circle class="person" cx="758" cy="353" r="13" fill="#88a476"/><rect x="771" y="337" width="46" height="20" rx="8" fill="#69845b"/><text x="777" y="351" class="tag">DATA</text>
+<circle class="person" cx="1198" cy="273" r="13" fill="#b58db3"/><rect x="1211" y="257" width="43" height="20" rx="8" fill="#997294"/><text x="1217" y="271" class="tag">WEB</text>
+<circle class="person" cx="243" cy="573" r="13" fill="#7392b5"/><rect x="256" y="557" width="42" height="20" rx="8" fill="#58799e"/><text x="262" y="571" class="tag">APP</text>
+<circle class="person" cx="1110" cy="548" r="13" fill="#88a476"/><rect x="1123" y="532" width="46" height="20" rx="8" fill="#69845b"/><text x="1129" y="546" class="tag">DATA</text></g>
+<!-- legend -->
+<g transform="translate(1160 80)"><text x="0" y="0" class="zsub" style="font-weight:700">작은 프로젝트 표식은 예시</text><circle cx="8" cy="28" r="7" fill="#d88f70"/><text x="22" y="33" class="zsub">프로젝트별 직원 소속</text><path d="M230 28h52" class="route"/><text x="292" y="33" class="zsub">공용 이동 동선</text></g>
+<text x="76" y="953" class="sub">개념 배치 · 목표 약 40 × 24m / 36명 기준 · 실측 도면 아님</text>
+</svg>
