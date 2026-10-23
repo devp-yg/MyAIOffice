@@ -1,41 +1,76 @@
 # My AI Office
 
-My AI Office is a local dashboard that visualizes Codex activity as a 3D office. It runs on your computer and reads local Codex session metadata to show projects, staff, and activity.
+My AI Office는 내 컴퓨터의 Codex 작업 현황을 사무실 모습으로 보여주는 로컬 앱입니다. 프로젝트와 작업 중인 세션을 층과 공간으로 살펴볼 수 있습니다.
 
-## Run the app
+## 바로 실행하기
 
-Extract the downloaded project or release ZIP, then launch the file for your computer:
+프로젝트 폴더의 실행 파일을 더블클릭하세요. 터미널에 명령어를 입력하거나 별도로 서버를 시작할 필요가 없습니다.
 
-- **Windows:** Double-click `Start My AI Office.bat`.
-- **macOS:** Double-click `Start My AI Office.command`. If macOS asks you to confirm, choose **Open**.
+- **Windows:** `Start My AI Office.bat`
+- **macOS:** `Start My AI Office.command`
 
-The launcher starts the local server and opens <http://127.0.0.1:4173> in your browser. Leave the server window open while using the office. On Windows, close the minimized server window to stop it; on macOS, close the Terminal window running the server.
+잠시 기다리면 브라우저에서 <http://127.0.0.1:4173>이 열립니다. 실행 중에는 서버 창을 닫지 마세요. 앱을 종료하려면 Windows에서는 서버 창을, macOS에서는 실행된 터미널 창을 닫으면 됩니다.
 
-### Node.js requirement
+macOS에서 확인 창이 나타나면 **열기(Open)**를 선택하세요.
 
-The source repository and source ZIP do not include Node.js. Install Node.js 24 or later from <https://nodejs.org/> before launching either file. There are no npm packages to install. A complete release ZIP can include its own Node.js runtime, so it can run without a separate Node.js installation.
+### 실행이 되지 않을 때
 
-If the launcher says Node.js 24 or later is required, install or update Node.js and run the launcher again. The macOS launcher supports Apple silicon and Intel Macs.
+GitHub에서 받은 소스 저장소에는 Node.js가 포함되어 있지 않습니다. 이 경우 [Node.js 24 이상](https://nodejs.org/)을 설치한 다음 실행 파일을 다시 더블클릭하세요. npm 패키지를 따로 설치할 필요는 없습니다.
 
-The server listens on the loopback interface, so it is available only on the computer running it. No account, external font, analytics service, or cloud connection is required.
+완성된 배포 ZIP에는 실행에 필요한 Node.js가 포함될 수 있어 별도 설치 없이 실행할 수 있습니다. 배포 ZIP에서도 Node.js 안내가 나타난다면 해당 플랫폼용 완성 ZIP인지 확인하세요. macOS 실행 파일은 Apple silicon과 Intel Mac을 지원합니다.
 
-### Local data
+## 처음 화면 둘러보기
 
-On first startup, the app creates a `data/` folder and the SQLite database at `data/office.sqlite` inside the project folder. It reads Codex session files from `~/.codex/sessions` on macOS and `%USERPROFILE%\.codex\sessions` on Windows, along with local project registrations when available. If that folder does not exist or has no sessions, the app can still start but will have no session activity to show. Session source files are not copied into the app database. Browser preferences stay in the browser's local storage. Keep the `data/` directory private and do not commit it.
+실행하면 현재 Codex 작업 현황이 표시됩니다. 실제 세션을 연결하기 전에 화면을 먼저 살펴보려면 **둘러보기**를 켜세요. 예시 직원과 프로젝트가 표시되며, 화면의 `DEMO` 표시로 실제 데이터와 구분할 수 있습니다. **실제 작업** 또는 **실제 세션으로**를 선택하면 내 Codex 작업 화면으로 돌아갑니다.
 
-## Build a desktop ZIP
+### 공용 오피스 화면
 
-Run `node build-release.mjs` to create a ZIP in `dist/`. The release builder includes the Node.js runtimes under `runtime/node/` when present, plus their license files. Those binaries are excluded from this Git repository because they are large. A source checkout can run with Node.js 24 installed; to build the self-contained macOS and Windows ZIP, provide the four platform runtimes in the same directory layout as the original distribution.
+여러 프로젝트와 공간을 한 층의 3D 사무실에서 살펴보는 화면입니다.
 
-The release ZIP does not include the developer's database or browser settings. On first launch it creates a fresh local database.
+![공용 오피스 실행 화면 — 둘러보기 예시 데이터](docs/images/shared-office-overview.png)
 
-## Project structure
+*공용 오피스의 실제 실행 화면입니다. 개인정보가 없는 둘러보기 예시 데이터로 표시했습니다.*
 
-- `public/`: web UI, 3D scene, and bundled Three.js files
-- `server*.mjs`: local server and session metadata handling
-- `docs/design/`: design notes and diagrams
-- `tests/`: automated tests (`npm test`)
-- `runtime/node/`: local release runtimes; not tracked by Git
-- `data/` and `dist/`: local database and generated release files; not tracked by Git
+### 화면 사용법
 
-Third-party software notices are included alongside bundled assets and runtimes.
+1. 위쪽의 **공용 오피스 / 타워 오피스**를 눌러 사무실 화면을 바꿉니다.
+2. 왼쪽 **공간 둘러보기**에서 방을 고르거나, **프로젝트 보기**에서 프로젝트를 선택합니다.
+3. 3D 화면에서 직원이나 공간을 누르면 해당 위치와 작업 정보를 확인할 수 있습니다.
+4. 화면 아래쪽의 **이름표 표시**, **움직임 효과**, 확대·축소, 시점 초기화 버튼으로 화면을 조정합니다.
+
+### 3D 화면 조작
+
+| 조작 | 동작 |
+| --- | --- |
+| 드래그 | 3D 공간 회전 |
+| 마우스 휠 또는 트랙패드 스크롤 | 확대·축소 |
+| Shift를 누른 채 드래그 | 화면 이동 |
+| **입체 / 위에서** | 카메라 각도 전환 |
+
+## 타워 오피스
+
+타워 오피스에서는 프로젝트를 층별로 확인할 수 있습니다. 왼쪽 층 목록에서 층이나 프로젝트를 선택하고, **작업 층만**을 켜면 작업 중인 층을 빠르게 찾을 수 있습니다. 3D 사무실에서 방이나 직원을 선택하면 해당 공간의 작업을 살펴볼 수 있습니다.
+
+## 데이터와 개인정보
+
+- 앱은 내 컴퓨터에서만 접속할 수 있도록 `127.0.0.1`에서 실행됩니다.
+- 첫 실행 시 프로젝트 폴더에 `data/office.sqlite` 데이터베이스가 자동으로 만들어집니다.
+- Codex 세션 정보는 macOS의 `~/.codex/sessions`, Windows의 `%USERPROFILE%\.codex\sessions`에서 읽습니다. 세션 원본 파일을 앱 데이터베이스로 복사하지 않습니다.
+- 앱은 대화 내용을 화면에 표시하지 않습니다. 실제 작업 정보가 보이는 화면을 공유하거나 캡처할 때는 내용을 확인하세요.
+- `data/`에는 개인 작업 데이터가 들어갈 수 있으므로 공유하거나 Git에 커밋하지 마세요. 이 폴더는 Git에서 제외되어 있습니다.
+- 세션 폴더가 없거나 세션이 아직 없다면 앱은 실행되지만 작업 현황은 비어 있을 수 있습니다. 이때도 둘러보기 화면을 사용할 수 있습니다.
+
+## 배포 ZIP 만들기
+
+개발 환경에서 `node build-release.mjs`를 실행하면 `dist/`에 ZIP을 만듭니다. 배포 ZIP 빌드에는 `runtime/node/`에 플랫폼별 Node.js 실행 파일이 필요합니다. 빌드된 ZIP에는 개발자의 데이터베이스나 브라우저 설정이 포함되지 않으며, 실행한 컴퓨터에서 새 데이터베이스를 만듭니다.
+
+## 프로젝트 구성
+
+- `public/`: 웹 화면, 3D 장면, Three.js 파일
+- `server*.mjs`: 로컬 서버와 Codex 세션 정보 처리
+- `docs/design/`: 설계 문서와 다이어그램
+- `tests/`: 자동화 테스트
+- `runtime/node/`: 배포용 Node.js 런타임 (Git 제외)
+- `data/`, `dist/`: 로컬 데이터와 생성된 배포 파일 (Git 제외)
+
+번들에 포함된 제3자 소프트웨어 고지는 각 에셋 및 런타임과 함께 제공됩니다.
