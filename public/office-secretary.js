@@ -22,6 +22,11 @@ export class SecretaryRoutine {
     this.job=null;this.jobIndex=0;this.greeting=null;this.pendingGreeting=null;this.ownerState=null;
     this.servedGuests=new Set();this.visitorCooldown=0;this.delivered=false;
   }
+  resetHome(position=null){
+    this.steps=[];this.index=0;this.stepTime=0;this.job=null;this.greeting=null;this.pendingGreeting=null;this.ownerState=null;this.delivered=false;
+    this.walker=new OfficeWalker(this.navigator,position||this.stops.home);this.idleTime=8;
+    if(position){this.steps=[walk('home','비서 데스크로 돌아가 업무를 정리하는 중')];this.enterStep();}
+  }
   get step(){return this.steps[this.index]||null;}
   get text(){return this.greeting?.text||this.step?.text||'일정과 방문객을 확인하는 중';}
   get prop(){return this.step?.prop||'clipboard';}

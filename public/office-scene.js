@@ -2,8 +2,8 @@ import * as THREE from './vendor/three/three.module.js';
 import { OfficeOwner } from './office-owner.js';
 import { buildExecutiveSuite as buildExecutiveInterior } from './office-executive-scene.js';
 import { SECRETARY_STATION, EXECUTIVE_INTERACTIONS } from './office-executive.js';
-import { OfficeNavigator, OfficeWalker, ROOM_LAYOUT, EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_WALLS, WALLS, DOORS, FURNITURE } from './office-navigation.js';
-import { SecretaryRoutine } from './office-secretary.js';
+import { OfficeNavigator, OfficeWalker, roomAt, ROOM_LAYOUT, EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_WALLS, WALLS, DOORS, FURNITURE } from './office-navigation.js';
+import { SecretaryRoutine, SECRETARY_STOPS } from './office-secretary.js';
 import { daylightAt, sunriseSunset } from './solar-time.js';
 
 const PALETTES={studio:0x8fae83,library:0xd0ad76,server:0x89a9c7,research:0x83b3a2,meeting:0xb39ace,desk:0xd9ab83};
@@ -194,7 +194,7 @@ export function createCharacter(parent,palette='studio',appearance={}){
 export class OfficeScene {
  constructor(element,{onSelectRoom,onSelectSession,onStatusChange,onFloorArrival,onOwnerStatus,onOwnerSelect,onCameraChange}={}){
   this.element=element;this.onSelectRoom=onSelectRoom;this.onSelectSession=onSelectSession;this.onStatusChange=onStatusChange;this.onFloorArrival=onFloorArrival;this.onOwnerStatus=onOwnerStatus;this.onOwnerSelect=onOwnerSelect;this.onCameraChange=onCameraChange;
-  this.navigator=new OfficeNavigator();this.actors=new Map();this.lights=[];this.roomMeshes=new Map();this.motion=true;this.paths=true;this.selectedId=null;this.selectedRoom=null;this.context=null;this.archiveMode=false;this.angle=.63;this.elevation=.63;this.zoom=1;this.lastTime=performance.now();this.statusSignature='';this.calls=new Map();this.viewTarget=new THREE.Vector3();
+  this.navigator=new OfficeNavigator();this.actors=new Map();this.lights=[];this.roomMeshes=new Map();this.motion=true;this.paths=true;this.selectedId=null;this.selectedRoom=null;this.ownerSelected=false;this.context=null;this.archiveMode=false;this.angle=.63;this.elevation=.63;this.zoom=1;this.lastTime=performance.now();this.statusSignature='';this.calls=new Map();this.viewTarget=new THREE.Vector3();
   this.scene=new THREE.Scene();this.scene.background=DAY_BACKGROUND.clone();this.lightingMinute=-1;this.location=null;this.solarEvents=null;
   this.camera=new THREE.OrthographicCamera(-20,20,12,-12,.1,160);
   this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
@@ -207,7 +207,7 @@ export class OfficeScene {
   this.labels=new Map();for(const room of [...ROOM_LAYOUT,...EXECUTIVE_ROOM_LAYOUT.filter(item=>!ROOM_LAYOUT.some(base=>base.key===item.key))]){const label=document.createElement('button');label.className='world-room-label';label.innerHTML=`<i></i><span>${ROOM_NAMES[room.key]||EXECUTIVE_ROOM_NAMES[room.key]}</span>`;label.setAttribute('aria-label',`${ROOM_NAMES[room.key]||EXECUTIVE_ROOM_NAMES[room.key]} 작업 보기`);label.addEventListener('click',()=>this.onSelectRoom?.(room.key));this.labelLayer.append(label);this.labels.set(room.key,{node:label,point:new THREE.Vector3(...room.label)});}
   this.secretaryLookDay=secretaryLookForDate();this.secretaryModel=createCharacter(this.world,'studio',{index:2,accessory:'glasses',secretary:true,secretaryOutfit:this.secretaryLookDay.look});this.secretaryModel.root.position.set(SECRETARY_STATION.x+.18,0,SECRETARY_STATION.z);this.secretaryModel.root.rotation.y=SECRETARY_STATION.rotation;this.secretaryModel.root.scale.setScalar(1.08);this.secretaryModel.root.visible=false;this.secretaryModel.props.clipboard.visible=true;
   this.secretaryLabel=document.createElement('div');this.secretaryLabel.className='world-agent-label secretary-label show-task';this.secretaryLabel.style.pointerEvents='none';this.labelLayer.append(this.secretaryLabel);this.setSecretaryIdentity('지니');
-  this.secretaryRoutine=null;this.secretaryServiceTimers={tea:0,snacks:0};this.secretaryServings={tea:secretaryTray(this.executiveSuiteGroup),snacks:secretaryTray(this.executiveSuiteGroup,{snacks:true})};this.secretaryServings.tea.position.set(-1.02,1.06,-1.65);this.secretaryServings.snacks.position.set(-8.65,.55,-4.35);for(const tray of Object.values(this.secretaryServings))tray.visible=false;
+  this.secretaryRoutine=null;this.secretaryRoutineExecutive=null;this.secretaryEscortWalker=null;this.secretaryEscortContext=null;this.secretaryEscortStart=null;this.secretaryEscortTargetIndex=null;this.secretaryEscorting=false;this.secretaryServiceTimers={tea:0,snacks:0};this.secretaryServings={tea:secretaryTray(this.executiveSuiteGroup),snacks:secretaryTray(this.executiveSuiteGroup,{snacks:true})};this.secretaryServings.tea.position.set(-1.02,1.06,-1.65);this.secretaryServings.snacks.position.set(-8.65,.55,-4.35);for(const tray of Object.values(this.secretaryServings))tray.visible=false;
   this.librarianLabel.className='world-agent-label show-task librarian-label';this.librarianLabel.style.pointerEvents='none';this.labelLayer.append(this.librarianLabel);
   this.owner=new OfficeOwner(this,createCharacter);
   this.routeLine=null;this.routeSignature='';
@@ -223,10 +223,43 @@ export class OfficeScene {
  setLocation(latitude,longitude){if(!Number.isFinite(latitude)||!Number.isFinite(longitude)){this.location=null;this.solarEvents=null;this.lightingMinute=-1;return;}this.location={latitude,longitude};this.solarEvents=sunriseSunset(new Date(),latitude,longitude);this.lightingMinute=-1;}
  updateSecretary(dt,time){
   this.refreshSecretaryLook();
-  if(!this.secretaryModel.root.visible||!this.navigator.executive)return;
+  const j=this.owner.journey,model=this.secretaryModel;
+  if(this.archiveMode||j.floor!==this.context||j.phase==='riding'){model.root.visible=false;this.secretaryLabel.hidden=true;return;}
+  model.root.visible=true;
   if(!this.secretaryRoutine)this.secretaryRoutine=new SecretaryRoutine(this.navigator,{onService:kind=>{this.secretaryServiceTimers[kind]=75;this.secretaryServings[kind].visible=true;}});
-  const routine=this.secretaryRoutine,model=this.secretaryModel,j=this.owner.journey;
-  const ceoPresent=j.floor===this.context,ceoReady=ceoPresent&&['idle','commanding'].includes(j.phase)&&this.owner.walker.room==='desk'&&!this.owner.walker.walking;
+  const routine=this.secretaryRoutine;
+  if(routine.navigator!==this.navigator||this.secretaryRoutineExecutive!==this.navigator.executive){routine.navigator=this.navigator;routine.stops=Object.fromEntries(Object.entries(SECRETARY_STOPS).map(([key,stop])=>[key,{...stop,...this.navigator.point(this.navigator.nearest(stop,stop.room))}]));routine.resetHome();this.secretaryEscortWalker=null;this.secretaryEscortTargetIndex=null;this.secretaryRoutineExecutive=this.navigator.executive;}
+  const ceoInsideOffice=this.navigator.executive&&roomAt(this.owner.walker.position,EXECUTIVE_ROOM_LAYOUT)==='desk';
+  const ceoReady=ceoInsideOffice&&['idle','commanding'].includes(j.phase)&&!this.owner.walker.walking;
+  if(!ceoInsideOffice){
+   if(!this.secretaryEscorting){this.secretaryEscortStart={x:model.root.position.x,z:model.root.position.z};routine.resetHome();this.secretaryEscorting=true;}
+   if(!this.secretaryEscortWalker||this.secretaryEscortContext!==this.context||this.secretaryEscortWalker.navigator!==this.navigator){
+    const contextChanged=Boolean(this.secretaryEscortContext&&this.secretaryEscortContext!==this.context),leader=this.owner.walker.position,heading=this.owner.walker.heading,behind={x:leader.x-Math.sin(heading)*1.15,z:leader.z-Math.cos(heading)*1.15},start=this.navigator.executive&&!contextChanged?(this.secretaryEscortStart||routine.walker.position):behind;
+    this.secretaryEscortWalker=new OfficeWalker(this.navigator,start);this.secretaryEscortTargetIndex=null;this.secretaryEscortContext=this.context;
+   }
+   const walker=this.secretaryEscortWalker,leader=this.owner.walker.position,ceoWalking=this.owner.walker.walking,heading=ceoWalking?this.owner.walker.heading:this.owner.model.root.rotation.y;
+   const foreAft=ceoWalking?-1:1,side=.82,forward=1.02;
+   const flank={x:leader.x+Math.sin(heading)*foreAft*forward+Math.cos(heading)*side,z:leader.z+Math.cos(heading)*foreAft*forward-Math.sin(heading)*side};
+   let targetIndex=this.navigator.nearest(flank);if(targetIndex<0)targetIndex=this.navigator.nearest(leader);
+   const target=targetIndex>=0?this.navigator.point(targetIndex):flank;
+   const queued=walker.pending?.point||walker.destination;
+   if(targetIndex>=0&&targetIndex!==this.secretaryEscortTargetIndex&&Math.hypot(walker.position.x-target.x,walker.position.z-target.z)>.72&&(!walker.walking||Math.hypot(queued.x-target.x,queued.z-target.z)>.8)){
+    walker.setDestination(target,null);this.secretaryEscortTargetIndex=targetIndex;
+   }
+   walker.tick(dt,1.72);
+   const walking=walker.walking,cycle=walker.distanceWalked*11,face=leader;
+   model.root.position.set(walker.position.x,0,walker.position.z);
+   const direction=walking?walker.heading:Math.atan2(face.x-walker.position.x,face.z-walker.position.z),delta=Math.atan2(Math.sin(direction-model.root.rotation.y),Math.cos(direction-model.root.rotation.y));model.root.rotation.y+=delta*Math.min(1,dt*8);
+   model.body.position.y=this.motion?(walking?Math.abs(Math.sin(cycle))*.03:Math.sin(time*.002)*.008):0;
+   model.legL.rotation.x=this.motion&&walking?Math.sin(cycle)*.38:0;model.legR.rotation.x=-model.legL.rotation.x;
+   model.armL.rotation.x=walking&&this.motion?-Math.sin(cycle)*.25:-.55;model.armR.rotation.x=walking&&this.motion?Math.sin(cycle)*.25:-.55;
+   for(const [key,prop]of Object.entries(model.props))prop.visible=key==='clipboard';
+   model.eyes.scale.y=this.motion&&time%5400>5250?.1:1;
+   const action=this.secretaryLabel.querySelector('.secretary-action'),text=walking?'CEO를 따라 이동하며 자료를 챙기는 중':'CEO의 업무 수행을 돕는 중';if(action.textContent!==text){action.textContent=text;this.secretaryLabel.setAttribute('aria-label',`${this.secretaryName} · 비서 · ${text}`);}this.secretaryLabel.dataset.action=walking?'walking':'assisting';this.secretaryLabel.classList.remove('greeting');
+   this.updateSecretaryServices(dt);return;
+  }
+  if(this.secretaryEscorting){routine.resetHome({x:model.root.position.x,z:model.root.position.z});this.secretaryEscorting=false;this.secretaryEscortWalker=null;this.secretaryEscortTargetIndex=null;}
+  const ceoPresent=true;
   const guests=[...this.actors.values()].filter(actor=>!actor.leaving&&actor.session.projectKey===this.context&&actor.desired.room==='reception'&&actor.walker.room==='reception'&&!actor.walker.walking).map(actor=>actor.session.id);
   routine.tick(dt,{ceoPresent,ceoReady,ceoPhase:j.phase,ceoRoom:this.owner.walker.room,guests});
   const walking=routine.walker.walking&&!routine.greeting&&routine.step?.action==='walk',carrying=routine.prop.endsWith('Tray'),action=routine.step?.action,cycle=routine.walker.distanceWalked*11;
@@ -245,8 +278,9 @@ export class OfficeScene {
   if(routine.greeting){const bow=this.motion?Math.sin(Math.PI*routine.greeting.elapsed/routine.greeting.duration):0;model.body.rotation.x=bow*(carrying?.05:.12);model.head.rotation.x=bow*.19;}
   model.eyes.scale.y=this.motion&&time%5400>5250?.1:1;
   const label=this.secretaryLabel.querySelector('.secretary-action');if(label.textContent!==routine.text){label.textContent=routine.text;this.secretaryLabel.setAttribute('aria-label',`${this.secretaryName} · 비서 · ${routine.text}`);}this.secretaryLabel.classList.toggle('greeting',Boolean(routine.greeting));this.secretaryLabel.dataset.action=routine.greeting?'greeting':walking?'walking':action||'idle';
-  for(const kind of Object.keys(this.secretaryServiceTimers)){this.secretaryServiceTimers[kind]=Math.max(0,this.secretaryServiceTimers[kind]-dt);this.secretaryServings[kind].visible=this.secretaryServiceTimers[kind]>0;}
+  this.updateSecretaryServices(dt);
  }
+ updateSecretaryServices(dt){for(const kind of Object.keys(this.secretaryServiceTimers)){this.secretaryServiceTimers[kind]=Math.max(0,this.secretaryServiceTimers[kind]-dt);this.secretaryServings[kind].visible=this.secretaryServiceTimers[kind]>0;}}
  buildOffice(){
   const ground=mesh(this.scene,new THREE.PlaneGeometry(100,100),new THREE.ShadowMaterial({opacity:.09}),0,-.61,0);ground.rotation.x=-Math.PI/2;ground.castShadow=false;
   this.standardOuterWallsGroup=group(this.world);
@@ -335,7 +369,7 @@ export class OfficeScene {
  }
  buildExecutiveSuite(){buildExecutiveInterior(this.executiveSuiteGroup,this.executiveRoomMeshes);}
  setExecutiveOffice(active){
-  const firstExecutive=active&&!this.hasSetExecutiveView,changed=this.navigator.executive!==active;this.navigator.setExecutive(active);this.executiveSuiteGroup.visible=active;this.standardLayoutGroup.visible=!active;this.standardOuterWallsGroup.visible=!active&&!this.archiveMode;this.element.classList.toggle('executive-scene',active);this.secretaryModel.root.visible=active&&!this.archiveMode;
+  const firstExecutive=active&&!this.hasSetExecutiveView,changed=this.navigator.executive!==active;this.navigator.setExecutive(active);this.executiveSuiteGroup.visible=active;this.standardLayoutGroup.visible=!active;this.standardOuterWallsGroup.visible=!active&&!this.archiveMode;this.element.classList.toggle('executive-scene',active);this.secretaryModel.root.visible=!this.archiveMode&&(active||this.owner?.journey.floor===this.context);
   this.roomMeshes=active?this.executiveRoomMeshes:this.standardRoomMeshes;
   const layout=active?EXECUTIVE_ROOM_LAYOUT:ROOM_LAYOUT,names=active?EXECUTIVE_ROOM_NAMES:ROOM_NAMES;
   for(const [key,label]of this.labels){const room=layout.find(item=>item.key===key);label.node.hidden=!room;label.node.dataset.zone=active?(['studio','reception','meeting'].includes(key)?'public':key==='desk'?'office':'private'):'';label.node.querySelector('span').textContent=names[key]||ROOM_NAMES[key]||key;label.node.setAttribute('aria-label',`${names[key]||ROOM_NAMES[key]||key} 작업 보기`);if(room)label.point.set(...room.label);label.node.classList.toggle('selected',key===this.selectedRoom);}
@@ -368,8 +402,9 @@ export class OfficeScene {
  setMotion(enabled){this.motion=enabled;}
  setEvening(enabled){this.scene.background.set(enabled?'#34463d':'#eef2ed');this.renderer.toneMappingExposure=enabled?.78:1.0;}
  setPaths(enabled){this.paths=enabled;this.routeSignature='';}
- setSelectedRoom(room){if(this.selectedRoom===room)return;this.selectedRoom=room;const layout=this.navigator.roomLayout;for(const [key,floor] of this.roomMeshes){if(!floor.userData.originalMaterial)floor.userData.originalMaterial=floor.material;if(floor.material!==floor.userData.originalMaterial)floor.material.dispose();const color=layout.find(item=>item.key===key)?.color||'#eeeeee';floor.material=key===room?new THREE.MeshStandardMaterial({color,emissive:0x8eaf6d,emissiveIntensity:.16,roughness:.9}):floor.userData.originalMaterial;floor.material.color.set(color);}for(const [key,label]of this.labels)label.node.classList.toggle('selected',key===room);}
- setSelectedSession(id){this.selectedId=id;for(const [key,actor]of this.actors){actor.model.selection.visible=key===id;actor.label.classList.toggle('selected',key===id);}this.routeSignature='';}
+ setSelectedRoom(room){if(this.selectedRoom===room)return;this.selectedRoom=room;if(room)this.setOwnerSelected(false);const layout=this.navigator.roomLayout;for(const [key,floor] of this.roomMeshes){if(!floor.userData.originalMaterial)floor.userData.originalMaterial=floor.material;if(floor.material!==floor.userData.originalMaterial)floor.material.dispose();const color=layout.find(item=>item.key===key)?.color||'#eeeeee';floor.material=key===room?new THREE.MeshStandardMaterial({color,emissive:0x8eaf6d,emissiveIntensity:.16,roughness:.9}):floor.userData.originalMaterial;floor.material.color.set(color);}for(const [key,label]of this.labels)label.node.classList.toggle('selected',key===room);}
+ setSelectedSession(id){this.selectedId=id;if(id)this.setOwnerSelected(false);for(const [key,actor]of this.actors){actor.model.selection.visible=key===id;actor.label.classList.toggle('selected',key===id);}this.routeSignature='';}
+ setOwnerSelected(selected){this.ownerSelected=Boolean(selected);if(this.owner?.model){this.owner.model.selection.visible=this.ownerSelected;this.owner.label.classList.toggle('selected',this.ownerSelected);this.owner.label.setAttribute('aria-pressed',String(this.ownerSelected));}}
  setSessions(sessions,context,archiveMode=false){
   this.archiveMode=archiveMode;
   this.context=context;
