@@ -85,7 +85,7 @@ try {
     onStatusChange:()=>{updateRooms();renderTeam();updateMovementSummary();},
     onFloorArrival:key=>{if(state.followOwner&&state.projects.some(p=>p.key===key))showFloor(key);},
     onOwnerStatus:status=>{ownerStatus=status;renderBuilding();renderLift();},
-    onOwnerSelect:()=>followOwner(),
+    onOwnerSelect:()=>selectOwner(),
     onCameraChange:view=>{$('#camera-elevation').value=view.elevation;$('#camera-angle-value').textContent=`${view.elevation}°`;$$('[data-camera-angle]').forEach(button=>button.classList.toggle('selected',Math.abs(Number(button.dataset.cameraAngle)-view.elevation)<2));},
   });
 } catch(error) {
@@ -212,12 +212,12 @@ function fitViewport(){
   queuePositions();
 }
 function queuePositions(){cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(positionSprites);}
-function memberMarkup(session){const room=visualRoom(session);const motion=officeScene?.getStatus(session.id);const moving=motion?.phase==='walking',receiving=motion?.phase==='receiving';const action=receiving?'☎ CEO의 원격 지시를 받는 중':moving?`${rooms[room].name}로 걸어가는 중`:`${rooms[room].name} · ${session.active?rooms[room].short:'잠깐 쉬는 중'}`;return `<button class="team-member ${state.selectedSession===session.id?'selected':''}" data-session="${escapeHtml(session.id)}" aria-label="${escapeHtml(sessionName(session))} 상세 보기"><span class="member-avatar">${characterSvg(room,{palette:paletteFor(session),idle:!session.active,error:session.error,accessory:session.identity?.accessory,index:session.identity?.index})}<i class="member-dot ${session.active?'':'idle'}"></i></span><span class="member-copy"><strong>${escapeHtml(sessionName(session))}${session.hasParent?' <span aria-label="서브에이전트">↗</span>':''}</strong><small>${action}</small></span><span class="member-tag ${session.error?'error':session.active?'':'idle'}">${receiving?'전화 수신':moving?'이동 중':session.error?'확인 중':session.active?'작업 중':'대기'}</span></button>`;}
+function memberMarkup(session){const room=visualRoom(session);const motion=officeScene?.getStatus(session.id);const moving=motion?.phase==='walking',receiving=motion?.phase==='receiving';const idleText=session.finished?'작업 완료 · 휴식 중':'응답 대기 중';const action=receiving?'☎ CEO의 원격 지시를 받는 중':moving?`${rooms[room].name}로 걸어가는 중`:`${rooms[room].name} · ${session.active?rooms[room].short:idleText}`;return `<button class="team-member ${state.selectedSession===session.id?'selected':''}" data-session="${escapeHtml(session.id)}" aria-label="${escapeHtml(sessionName(session))} 상세 보기"><span class="member-avatar">${characterSvg(room,{palette:paletteFor(session),idle:!session.active,error:session.error,accessory:session.identity?.accessory,index:session.identity?.index})}<i class="member-dot ${session.active?'':'idle'}"></i></span><span class="member-copy"><strong>${escapeHtml(sessionName(session))}${session.hasParent?' <span aria-label="서브에이전트">↗</span>':''}</strong><small>${action}</small></span><span class="member-tag ${session.error?'error':session.active?'':'idle'}">${receiving?'전화 수신':moving?'이동 중':session.error?'확인 중':session.active?'작업 중':session.finished?'완료':'응답 대기'}</span></button>`;}
 function renderTeam(){const list=filteredSessions();const active=list.filter(session=>session.active);const display=state.teamFilter==='active'?active:list;$('#team-count').textContent=list.length;$('#tab-all-count').textContent=list.length;$('#tab-active-count').textContent=active.length;$('#team-list').innerHTML=display.length?display.map(memberMarkup).join(''):`<div class="team-empty">${characterSvg('studio',{idle:true})}<strong>${state.teamFilter==='active'?'지금은 쉬는 시간이에요':'아직 조용한 사무실이에요'}</strong><p>${state.teamFilter==='active'?'새 작업이 시작되면 여기에 나타나요.':'Codex가 작업을 시작하면 친구가 출근해요.'}</p></div>`;renderDetail();}
 function renderDetail(){
   const session=state.sessions.find(item=>item.id===state.selectedSession),node=$('#selected-detail');node.hidden=!session;if(!session)return;
   const motion=officeScene?.getStatus(session.id);
-  const action=motion?.phase==='receiving'?'☎ CEO의 원격 지시를 받는 중':motion?.phase==='walking'?`${rooms[motion.target].name}로 걸어가는 중`:session.active?session.label:'대기실에서 쉬는 중';
+  const action=motion?.phase==='receiving'?'☎ CEO의 원격 지시를 받는 중':motion?.phase==='walking'?`${rooms[motion.target].name}로 걸어가는 중`:session.active?session.label:session.finished?'작업 완료 · 휴식 중':'응답 대기 중';
   const location=motion?(motion.room?rooms[motion.room].name:'복도'):rooms[visualRoom(session)].name;
   node.innerHTML=`<div class="detail-heading">${escapeHtml(sessionName(session))}<button aria-label="상세 정보 닫기" id="close-detail">×</button></div><p class="detail-action">${escapeHtml(action)}</p><dl><dt>프로젝트</dt><dd>${escapeHtml(session.project)}</dd><dt>현재 위치</dt><dd>${location}</dd><dt>업무</dt><dd>${escapeHtml(session.label)}</dd><dt>마지막 활동</dt><dd>${relativeTime(session.updatedAt)}</dd><dt>역할</dt><dd>${escapeHtml(session.role||(session.hasParent?'서브에이전트':'메인 세션'))}</dd><dt>외형</dt><dd>${escapeHtml(session.identity?.detail||'')}</dd><dt>연결</dt><dd>채팅 #${session.identity?.chatNumber||1}${session.nickname?' · '+escapeHtml(session.nickname):''}</dd></dl>`;
 }
@@ -297,7 +297,7 @@ function showFloor(key){
   if(button){const b=button.getBoundingClientRect(),p=list.getBoundingClientRect();if(list.scrollHeight>list.clientHeight)list.scrollTop+=b.top-p.top-(list.clientHeight-b.height)/2;if(list.scrollWidth>list.clientWidth)list.scrollLeft+=b.left-p.left-(list.clientWidth-b.width)/2;}
 
 }
-function showArchive(){state.archiveView=true;state.selectedArchive=null;state.selectedRoom='library';state.selectedSession=null;state.followOwner=false;const top=state.projects.reduce((highest,item)=>!highest||item.number>highest.number?item:highest,null);if(top)state.projectKey=top.key;render();const list=$('#building-floors'),button=list.querySelector('[data-archive-floor]');if(button){const b=button.getBoundingClientRect(),p=list.getBoundingClientRect();if(list.scrollHeight>list.clientHeight)list.scrollTop+=b.top-p.top-(list.clientHeight-b.height)/2;}}
+function showArchive(){state.archiveView=true;state.selectedArchive=null;state.selectedRoom='library';state.selectedSession=null;state.followOwner=false;officeScene?.setOwnerSelected(false);const top=state.projects.reduce((highest,item)=>!highest||item.number>highest.number?item:highest,null);if(top)state.projectKey=top.key;render();const list=$('#building-floors'),button=list.querySelector('[data-archive-floor]');if(button){const b=button.getBoundingClientRect(),p=list.getBoundingClientRect();if(list.scrollHeight>list.clientHeight)list.scrollTop+=b.top-p.top-(list.clientHeight-b.height)/2;}}
 function travelView(key){
   cancelAnimationFrame(viewerFrame);const destination=state.projects.find(f=>f.key===key);if(!destination||state.projectKey===key){viewerTrip=null;if(destination)showFloor(key);renderLift();return;}
   const start=performance.now(),duration=prefs.motion?1400:450;viewerTrip={from:project()?.number,to:destination.number,progress:0};let switched=false;
@@ -305,6 +305,7 @@ function travelView(key){
   viewerFrame=requestAnimationFrame(step);
 }
 function followOwner(){state.followOwner=true;renderBuilding();const key=officeScene?.owner.journey.floor;if(key)travelView(key);}
+function selectOwner(){const selected=!officeScene?.ownerSelected;state.selectedSession=null;state.selectedRoom=null;officeScene?.setSelectedRoom(null);officeScene?.setSelectedSession(null);officeScene?.setOwnerSelected(selected);if(selected)followOwner();else{state.followOwner=false;renderBuilding();}}
 function acceptRealSnapshot(snapshot){
   if(!snapshot||!Array.isArray(snapshot.sessions)||snapshot.ready===false||(realSnapshot.checkedAt&&snapshot.checkedAt<realSnapshot.checkedAt))return;
   const hasData=Boolean(snapshot.projects?.length||snapshot.sessions.length||snapshot.archives?.length);
@@ -316,7 +317,7 @@ function acceptRealSnapshot(snapshot){
 async function refresh(showProgress=true){if(refreshPending)return;refreshPending=true;const button=$('#refresh'),controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);if(showProgress)button.classList.add('refreshing');try{const response=await fetch('/api/state',{cache:'no-store',signal:controller.signal});if(!response.ok)throw Error('Unavailable');acceptRealSnapshot(await response.json());if(!state.demo)setConnection(true);}catch{setConnection(false);if(!state.sessions.length)render();}finally{clearTimeout(timeout);refreshPending=false;if(showProgress)button.classList.remove('refreshing');}}
 function selectRoom(key){state.selectedRoom=state.selectedRoom===key?null:key;state.selectedSession=null;render();}
 function setMenu(open){$('#project-menu').hidden=!open;$('#floor-picker').setAttribute('aria-expanded',String(open));if(open){renderProjects();$('#project-search').focus();}else $('#project-search').value='';}
-function setProject(key){state.archiveView=false;state.followOwner=false;setMenu(false);renderBuilding();renderHeader();travelView(key);}
+function setProject(key){state.archiveView=false;state.followOwner=false;officeScene?.setOwnerSelected(false);setMenu(false);renderBuilding();renderHeader();travelView(key);}
 function selectSession(id){const session=state.sessions.find(item=>item.id===id);if(!session)return;state.selectedSession=state.selectedSession===id?null:id;renderTeam();updateSprites();}
 function openDialog(selector){const dialog=$(selector);if(selector==='#activity-dialog')renderLog();dialog.showModal();}
 function makeDemo(){

@@ -5,6 +5,7 @@ import {SHARED_ROOMS,ROOM_CORNER_RADIUS,ZONE_BOUNDARY_STYLES,createSharedLayout,
 import {SharedExecutiveWing} from './shared-office-executive.js';
 import {daylightAt,sunriseSunset} from './solar-time.js';
 import {buildSharedGround} from './shared-office-ground.js';
+import {SharedOfficeLabels} from './shared-office-labels.js';
 
 const materialCache=new Map();
 const DAY_BACKGROUND=new THREE.Color('#eef2ed'),NIGHT_BACKGROUND=new THREE.Color('#68747d');
@@ -63,8 +64,8 @@ function batchStatic(root){
 }
 
 export class SharedOfficeScene {
-  constructor(element,{onRoom,onActor,onView,onWalkEnd,preferences={}}={}){
-    this.element=element;this.onRoom=onRoom;this.onActor=onActor;this.onView=onView;this.onWalkEnd=onWalkEnd;
+  constructor(element,{onRoom,onActor,onOwner,onView,onWalkEnd,preferences={}}={}){
+    this.element=element;this.onRoom=onRoom;this.onActor=onActor;this.onOwner=onOwner;this.onView=onView;this.onWalkEnd=onWalkEnd;
     this.scene=new THREE.Scene();this.scene.background=DAY_BACKGROUND.clone();this.lightingMinute=-1;this.location=null;this.solarEvents=null;this.ambientFixtures=[];
     this.world=new THREE.Group();this.scene.add(this.world);this.camera=new THREE.OrthographicCamera(-24,24,16,-16,.1,180);
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
@@ -72,21 +73,24 @@ export class SharedOfficeScene {
     const canvas=this.renderer.domElement;canvas.setAttribute('aria-label','공용 오피스 3D 공간 시안. 드래그로 회전, 스크롤로 확대하고 직원이나 업무 구역을 선택하세요.');canvas.setAttribute('role','img');element.append(canvas);
     this.sky=new THREE.HemisphereLight(0xfff9ed,0xb0bc9f,1.9);this.scene.add(this.sky);
     this.sun=new THREE.DirectionalLight(0xfff4dc,2.1);this.sun.position.set(-16,32,8);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);Object.assign(this.sun.shadow.camera,{left:-28,right:28,top:28,bottom:-28,near:1,far:80});this.sun.shadow.bias=-.0003;this.sun.shadow.normalBias=.03;this.sun.shadow.radius=4;this.scene.add(this.sun);
-    this.angle=.48;this.elevation=.72;this.zoom=1;this.viewTarget=new THREE.Vector3(0,0,0);this.motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;this.showLabels=true;this.project=null;this.selectedId=null;this.selectedRoom=null;this.actors=[];this.lights=[];
+    this.angle=.48;this.elevation=.72;this.zoom=1;this.viewTarget=new THREE.Vector3(0,0,0);this.motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;this.showLabels=true;this.project=null;this.selectedId=null;this.selectedOwner=false;this.selectedRoom=null;this.actors=[];this.lights=[];
     this.labelLayer=document.createElement('div');this.labelLayer.className='study-labels';element.append(this.labelLayer);this.roomLabels=new Map();
     for(const room of SHARED_ROOMS){
       const label=document.createElement('button');label.className='study-room-label';label.style.setProperty('--room-color',room.color);const name=document.createElement('strong');name.textContent=room.name;const count=document.createElement('span');label.append(name,count);label.addEventListener('click',()=>this.onRoom?.(room.key));this.labelLayer.append(label);this.roomLabels.set(room.key,{node:label,point:new THREE.Vector3(...room.label)});
     }
     const gardenLabel=document.createElement('div');gardenLabel.className='study-garden-label';gardenLabel.textContent='COURTYARD · 정원';this.labelLayer.append(gardenLabel);this.gardenLabel=gardenLabel;
     const entryLabel=document.createElement('div');entryLabel.className='study-entry-label';entryLabel.textContent='출퇴근 출입구';this.labelLayer.append(entryLabel);this.entryLabel=entryLabel;
-    this.executive=new SharedExecutiveWing(this.world,this.labelLayer,{batch:batchStatic,onSelect:()=>this.onRoom?.('executive'),preferences});
+    this.executive=new SharedExecutiveWing(this.world,this.labelLayer,{batch:batchStatic,onSelect:()=>this.onRoom?.('executive'),onOwnerSelect:()=>this.onOwner?.(),preferences});
+    this.actorLabels=new SharedOfficeLabels(this.labelLayer);
+    this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),selected:()=>this.selectedOwner,summary:()=> '… 대기'});
+    this.actorLabels.add(this.executive.secretaryLabel,{model:()=>this.executive.assisting?this.executive.companion:this.executive.secretary,working:()=>true});
     // Use the existing office camera gestures and keyboard controls.
     canvas.addEventListener('pointerdown',()=>{this.transition=null;});
     OfficeScene.prototype.bindControls.call(this);
     this.setLocation(preferences.latitude,preferences.longitude);
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(element);this.resize();this.lastTime=performance.now();this.frame=this.frame.bind(this);this.frameHandle=requestAnimationFrame(this.frame);
   }
-  removeActor(actor){actor.model.root.removeFromParent();disposeCharacter(actor.model);actor.label.remove();actor.marker.geometry.dispose();actor.marker.material.dispose();actor.marker.removeFromParent();}
+  removeActor(actor){this.actorLabels.remove(actor.label);actor.model.root.removeFromParent();disposeCharacter(actor.model);actor.label.remove();actor.marker.geometry.dispose();actor.marker.material.dispose();actor.marker.removeFromParent();}
   rebuildLayout(layout){
     if(this.layoutGroup){
       this.groundDesign?.dispose();this.layoutGroup.removeFromParent();for(const geometry of this.ownedGeometries||[])geometry.dispose();for(const material of this.ownedMaterials||[])material.dispose();
@@ -113,7 +117,7 @@ export class SharedOfficeScene {
     this.groundDesign?.updateLighting(darkness);
   }
   setScenario(scenario){
-    this.live=false;this.geometrySignature='';this.stopWalk();for(const actor of this.actors)this.removeActor(actor);this.actors=[];this.selectedId=null;
+    this.live=false;this.geometrySignature='';this.stopWalk();for(const actor of this.actors)this.removeActor(actor);this.actors=[];this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');
     this.rebuildLayout(createSharedLayout(scenario));
     for(const assignment of createPreviewAssignments(this.layout,scenario))this.addActor(assignment);
     for(const room of SHARED_ROOMS){const count=this.actors.filter(a=>a.seat.room===room.key).length;this.roomLabels.get(room.key).node.querySelector('span').textContent=`${count}명 · ${this.layout.pods.filter(p=>p.room===room.key).length} 포드`;}
@@ -225,6 +229,11 @@ export class SharedOfficeScene {
     const label=document.createElement('button');label.className='study-agent-label';label.style.setProperty('--project',project.color);const nameLine=document.createElement('strong'),nameText=document.createElement('span'),rankLine=document.createElement('small'),projectLine=document.createElement('small'),actionLine=document.createElement('span');nameLine.append(nameText,rankLine);rankLine.className='study-agent-rank';projectLine.className='study-agent-project';actionLine.className='study-agent-action';label.append(nameLine,projectLine,actionLine);label.addEventListener('click',()=>this.onActor?.(id));this.labelLayer.append(label);
     const walker=new OfficeWalker(this.navigator,spawn);if(startPoint)walker.setDestination(point,seat.room);
     const actor={id,model,label,marker,seat,project,index,session,walker,name};
+    this.actorLabels.add(label,{
+      model:()=>actor.model,selected:()=>actor.id===this.selectedId,
+      working:()=>!actor.departing&&(!actor.session||actor.session.active||actor.session.error||(actor.commandUntil||0)>performance.now()),
+      summary:()=>actor.departing?'↗ 퇴근':actor.session?.finished?'✓ 완료':actor.session&&!actor.session.active?'◷ 응답 대기':({nap:'☾ 낮잠',game:'◇ 게임',read:'▤ 독서',relax:'☕ 휴식',stretch:'↟ 스트레칭'}[actor.session?.identity?.idle]||'… 대기'),
+    });
     for(const [key,prop]of Object.entries(model.props))prop.visible=key===seat.mode;
     this.actors.push(actor);
     this.updateActorLabel(actor);
@@ -233,7 +242,7 @@ export class SharedOfficeScene {
     actor.departing=true;actor.session=null;actor.label.dataset.state='departing';actor.label.querySelector('.study-agent-action').textContent='출입구로 이동 중';
     actor.walker.setDestination({x:this.layout.bounds.maxX+1.8,z:0},null);
   }
-  updateActorLabel(actor){const room=SHARED_ROOMS.find(r=>r.key===actor.seat.room).name,receiving=(actor.commandUntil||0)>performance.now(),activity=receiving?'☎ CEO의 지시를 확인하는 중':actor.session?(actor.session.active?(actor.session.codexNote||actor.session.label||`${room}에서 작업 중`):`휴식 · ${actor.session.finished?'작업을 마쳤어요':'최근 활동을 기다리는 중'}`):`${room}에서 함께 일하는 중`,rank=actor.session?.hasParent?'서브에이전트':'메인 세션',nameText=actor.label.querySelector('strong > span'),rankLine=actor.label.querySelector('.study-agent-rank'),projectLine=actor.label.querySelector('.study-agent-project'),actionLine=actor.label.querySelector('.study-agent-action');nameText.textContent=actor.name;rankLine.textContent=rank;projectLine.textContent=actor.project.name||actor.project.code;actionLine.textContent=activity;actor.label.title=`${actor.name} · ${rank} · ${actor.project.name} · ${activity}`;actor.label.setAttribute('aria-label',`${actor.name} · ${rank} · ${actor.project.name} 프로젝트 · ${activity} · ${room}`);actor.label.dataset.error=String(Boolean(actor.session?.error));}
+  updateActorLabel(actor){const room=SHARED_ROOMS.find(r=>r.key===actor.seat.room).name,receiving=(actor.commandUntil||0)>performance.now(),activity=receiving?'☎ CEO의 지시를 확인하는 중':actor.session?(actor.session.active?(actor.session.codexNote||actor.session.label||`${room}에서 작업 중`):actor.session.finished?'작업 완료 · 휴식 중':'응답 대기 중'): `${room}에서 함께 일하는 중`,rank=actor.session?.hasParent?'서브에이전트':'메인 세션',nameText=actor.label.querySelector('strong > span'),rankLine=actor.label.querySelector('.study-agent-rank'),projectLine=actor.label.querySelector('.study-agent-project'),actionLine=actor.label.querySelector('.study-agent-action');nameText.textContent=actor.name;rankLine.textContent=rank;projectLine.textContent=actor.project.name||actor.project.code;actionLine.textContent=activity;actor.label.title=`${actor.name} · ${rank} · ${actor.project.name} · ${activity}`;actor.label.setAttribute('aria-label',`${actor.name} · ${rank} · ${actor.project.name} 프로젝트 · ${activity} · ${room}`);actor.label.dataset.error=String(Boolean(actor.session?.error));}
   setProject(key){
     this.project=key;for(const actor of this.actors){const visible=!key||actor.project.key===key;actor.model.root.visible=visible;actor.marker.visible=visible;actor.label.hidden=!visible;}
     if(this.selectedId&&!this.actors.find(a=>a.id===this.selectedId)?.model.root.visible)this.selectedId=null;
@@ -241,10 +250,11 @@ export class SharedOfficeScene {
     for(const room of SHARED_ROOMS){const total=this.actors.filter(a=>a.seat.room===room.key).length,visible=this.actors.filter(a=>a.seat.room===room.key&&a.model.root.visible).length,pods=this.layout.pods.filter(p=>p.room===room.key).length;this.roomLabels.get(room.key).node.querySelector('span').textContent=`${key?`${visible}/${total}`:total}명 · ${pods} 포드`;}
     if(this.routeLine)this.routeLine.visible=this.walkActor?.model.root.visible;this.updateLabels();
   }
-  selectActor(id){this.selectedId=id;this.selectedRoom=null;for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=a.id===id;a.label.classList.toggle('selected',a.id===id);}const actor=this.actors.find(a=>a.id===id);if(actor)this.focus(actor.walker.position.x,actor.walker.position.z,2.8);}
-  selectRoom(key){this.selectedRoom=key;this.selectedId=null;for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}for(const [k,m]of this.roomMeshes)m.material.emissive.set(k===key?'#213921':'#000000');for(const m of this.executive.floors.values())m.material.emissive.set(key==='executive'?'#172315':'#000000');const room=key==='executive'?this.layout.executive:this.layout.rooms.find(r=>r.key===key);if(room){const [x0,x1,z0,z1]=room.bounds;this.focus((x0+x1)/2,(z0+z1)/2,2.05);}}
+  selectActor(id){this.selectedId=id;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.selectedRoom=null;for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=a.id===id;a.label.classList.toggle('selected',a.id===id);}const actor=this.actors.find(a=>a.id===id);if(actor)this.focus(actor.walker.position.x,actor.walker.position.z,2.8);}
+  selectOwner(){this.selectedOwner=!this.selectedOwner;this.selectedId=null;this.selectedRoom=null;this.executive.owner.selection.visible=this.selectedOwner;this.executive.ownerLabel.classList.toggle('selected',this.selectedOwner);this.executive.ownerLabel.setAttribute('aria-pressed',String(this.selectedOwner));for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);if(this.selectedOwner)this.focus(this.executive.owner.root.position.x,this.executive.owner.root.position.z,2.8);}
+  selectRoom(key){this.selectedRoom=key;this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}for(const [k,m]of this.roomMeshes)m.material.emissive.set(k===key?'#213921':'#000000');for(const m of this.executive.floors.values())m.material.emissive.set(key==='executive'?'#172315':'#000000');const room=key==='executive'?this.layout.executive:this.layout.rooms.find(r=>r.key===key);if(room){const [x0,x1,z0,z1]=room.bounds;this.focus((x0+x1)/2,(z0+z1)/2,2.05);}}
   focus(x,z,zoom){this.transition={from:this.viewTarget.clone(),to:new THREE.Vector3(x,0,z),zoomFrom:this.zoom,zoomTo:zoom,start:performance.now()};}
-  resetView(){this.transition=null;this.angle=.48;this.elevation=.72;this.zoom=1;this.selectedRoom=null;this.selectedId=null;this.viewTarget.set(0,0,0);for(const m of [...(this.roomMeshes?.values()||[]),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}this.resize();}
+  resetView(){this.transition=null;this.angle=.48;this.elevation=.72;this.zoom=1;this.selectedRoom=null;this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.viewTarget.set(0,0,0);for(const m of [...(this.roomMeshes?.values()||[]),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}this.resize();}
   setElevation(degrees){this.transition=null;this.elevation=THREE.MathUtils.clamp(Number(degrees),12,89)*Math.PI/180;this.resize();}
   setZoom(value){this.transition=null;this.zoom=THREE.MathUtils.clamp(value,.65,4.5);this.resize();}
   resize(){
@@ -259,8 +269,8 @@ export class SharedOfficeScene {
   }
   pick(event){
     const b=this.renderer.domElement.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((event.clientX-b.left)/b.width*2-1,1-(event.clientY-b.top)/b.height*2),this.camera);
-    const roots=this.actors.filter(a=>a.model.root.visible).map(a=>a.model.root);const hits=ray.intersectObjects([...roots,...this.roomMeshes.values(),...this.executive.floors.values()],true);
-    for(const hit of hits){let o=hit.object;while(o){if(o.userData.sessionId){this.onActor?.(o.userData.sessionId);return;}if(o.userData.room){this.onRoom?.(o.userData.room);return;}o=o.parent;}}
+    const roots=this.actors.filter(a=>a.model.root.visible).map(a=>a.model.root);if(this.executive.owner.root.visible)roots.push(this.executive.owner.root);const hits=ray.intersectObjects([...roots,...this.roomMeshes.values(),...this.executive.floors.values()],true);
+    for(const hit of hits){let o=hit.object;while(o){if(o.userData.owner){this.onOwner?.();return;}if(o.userData.sessionId){this.onActor?.(o.userData.sessionId);return;}if(o.userData.room){this.onRoom?.(o.userData.room);return;}o=o.parent;}}
   }
   projectPoint(node,point){const p=point.clone().project(this.camera);node.hidden=p.x<-.97||p.x>.97||p.y<-.95||p.y>.95;node.style.left=`${(p.x+1)*this.width/2}px`;node.style.top=`${(1-p.y)*this.height/2}px`;return {x:(p.x+1)*this.width/2,y:(1-p.y)*this.height/2};}
   updateLabels(){
@@ -269,16 +279,7 @@ export class SharedOfficeScene {
     this.projectPoint(this.entryLabel,new THREE.Vector3(this.layout.bounds.maxX+1.2,2.9,0));
     const garden=this.layout.park.label;this.projectPoint(this.gardenLabel,new THREE.Vector3(garden.x,.35,garden.z));
     if(this.executive.layout)this.executive.updateLabels((node,point)=>this.projectPoint(node,point),this.zoom);
-    const placed=[];
-    const sorted=[...this.actors].sort((a,b)=>Number(b.id===this.selectedId)-Number(a.id===this.selectedId));
-    for(const actor of sorted){
-      if(!actor.model.root.visible||!this.showLabels){actor.label.hidden=true;continue;}
-      const p=this.projectPoint(actor.label,new THREE.Vector3(actor.walker.position.x,2.0,actor.walker.position.z));if(actor.label.hidden)continue;
-      const rect=actor.label.getBoundingClientRect(),dxStep=Math.max(112,rect.width+12),dyStep=Math.max(48,rect.height+10),candidates=[[0,0]];for(let row=0;row<=5;row++)for(let col=-4;col<=4;col++)if(row||col)candidates.push([col*dxStep,row*dyStep]);candidates.sort((a,b)=>Math.hypot(a[0],a[1])-Math.hypot(b[0],b[1]));
-      let best=null,bestOverlap=Infinity;
-      for(const [dx,dy]of candidates){const x=THREE.MathUtils.clamp(p.x+dx,rect.width/2+5,this.width-rect.width/2-5),y=THREE.MathUtils.clamp(p.y-dy-13,rect.height+5,this.height-5),box={x:x-rect.width/2,y:y-rect.height,w:rect.width,h:rect.height};let overlap=0;for(const other of placed){const iw=Math.max(0,Math.min(box.x+box.w,other.x+other.w)-Math.max(box.x,other.x)),ih=Math.max(0,Math.min(box.y+box.h,other.y+other.h)-Math.max(box.y,other.y));overlap+=iw*ih;}if(overlap<bestOverlap){bestOverlap=overlap;best={x,y,box};}if(!overlap)break;}
-      actor.label.style.setProperty('--bubble-x',`${best.x-p.x}px`);actor.label.style.setProperty('--bubble-y',`${Math.max(0,p.y-best.y-13)}px`);placed.push(best.box);
-    }
+    this.actorLabels?.update(this.camera,this.width,this.height,this.showLabels);
   }
   startWalk(){
     if(this.walkActor)return false;
@@ -325,5 +326,5 @@ export class SharedOfficeScene {
     if(this.live){const actor=this.showPaths!==false&&(this.actors.find(a=>a.id===this.selectedId&&a.walker.walking)||this.actors.find(a=>a.model.root.visible&&a.walker.walking)),signature=actor?`${actor.id}:${actor.walker.route.length}:${actor.walker.destination.x}:${actor.walker.destination.z}`:'';if(signature!==this.routeSignature){this.routeSignature=signature;if(actor)this.drawRoute(actor);else this.clearRoute();}}
     this.updateLabels();this.renderer.render(this.scene,this.camera);
   }
-  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
+  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
 }

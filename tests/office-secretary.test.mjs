@@ -1,11 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {OfficeNavigator,roomAt} from '../public/office-navigation.js';
+import {OfficeNavigator,OfficeWalker,roomAt} from '../public/office-navigation.js';
 import {SecretaryRoutine} from '../public/office-secretary.js';
+import {createSharedLayout,SCENARIOS} from '../public/shared-office-layout.js';
 
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 function secretary(options){const nav=new OfficeNavigator();nav.setExecutive(true);return new SecretaryRoutine(nav,{random:()=>0,...options});}
 const owner={ceoPresent:true,ceoReady:true,ceoPhase:'idle'};
+
+test('secretary can exit the shared executive suite from every duty stop and return safely',()=>{
+  const routine=secretary();
+  for(const scenario of Object.keys(SCENARIOS)){
+    const layout=createSharedLayout(scenario),nav=new OfficeNavigator(layout),suite=layout.executive;
+    const outside=nav.point(nav.nearest(layout.circulation.gardenVisit));
+    for(const [name,stop] of Object.entries(routine.stops)){
+      const inside={x:suite.x-stop.x,z:suite.z-stop.z};
+      for(const [from,to] of [[inside,outside],[outside,inside]]){
+        const path=nav.findPath(from,to);
+        assert.ok(path.length,`${scenario}: no route for ${name}`);
+        const walker=new OfficeWalker(nav,from);walker.setDestination(to,null);
+        for(let tick=0;tick<2400&&walker.walking;tick++){
+          const before={...walker.position};walker.tick(.05,1.72);
+          assert.ok(distance(before,walker.position)<=.086001,'escort teleported');
+          assert.ok(nav.segmentIsSafe(before,walker.position),`${scenario}: unsafe passage for ${name}`);
+        }
+        assert.ok(!walker.blocked&&distance(walker.position,to)<.01,`${scenario}: escort stopped before ${name}`);
+      }
+    }
+  }
+});
 
 test('secretary can leave her desk and reach every service stop through safe passages',()=>{
   const routine=secretary(),nav=routine.navigator;

@@ -11,6 +11,7 @@ let showResting=stored('shared-office-show-resting',true),rememberedProject=proj
 const announce=text=>{$('#study-announcement').textContent=text;};
 const countText=(element,value,unit)=>{element.replaceChildren(document.createTextNode(String(value)));const small=document.createElement('small');small.textContent=unit;element.append(small);};
 const roomName=key=>key==='executive'?'CEO 집무실':SHARED_ROOMS.find(r=>r.key===key)?.name||'업무 공간';
+const inactiveStatus=session=>session.finished?'작업 완료 · 휴식 중':'응답 대기 중';
 const timeText=timestamp=>timestamp?new Intl.DateTimeFormat('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(timestamp)):'—';
 function towerUrl(key=project,id=selectedSession){const params=new URLSearchParams({view:'tower'});if(key)params.set('project',key);if(id)params.set('session',id);return '/?'+params;}
 function detail(title,text){$('#study-detail strong').textContent=title;$('#study-detail p').textContent=text;}
@@ -37,21 +38,22 @@ function renderCounts(){
   const b=scene.layout.bounds,width=Math.round(b.maxX-b.minX),depth=Math.round((b.maxZ-b.minZ)*10)/10;
   $('#space-size').replaceChildren(document.createTextNode(`${width} × ${depth}`));const m=document.createElement('small');m.textContent='m';$('#space-size').append(m);
   for(const room of SHARED_ROOMS)$(`[data-room="${room.key}"]>span:last-child`).textContent=`${scene.actors.filter(a=>a.seat.room===room.key&&(!project||a.project.key===project)).length}명`;
-  const shown=scene.actors.filter(a=>!project||a.project.key===project),resting=shown.filter(a=>a.session&&!a.session.active).length;
-  $('#stage-population').textContent=demo?`${shown.length}명 예시 배치`:`화면 ${shown.length}명 · 휴식 ${resting}명`;
+  const shown=scene.actors.filter(a=>!project||a.project.key===project),waiting=shown.filter(a=>a.session&&!a.session.active&&!a.session.finished).length,resting=shown.filter(a=>a.session&&!a.session.active&&a.session.finished).length;
+  $('#stage-population').textContent=demo?`${shown.length}명 예시 배치`:`화면 ${shown.length}명 · 응답 대기 ${waiting}명 · 휴식 ${resting}명`;
   $('#live-summary').textContent=`전체 ${(latest?.sessions||[]).filter(s=>s.active).length}명 작업 중 · 화면에 ${scene.actors.length}명`;
   $('#last-updated').textContent=latest?`${timeText(latest.checkedAt)} 확인 · ${connection==='offline'?'마지막 수신 상태':'이 PC의 Codex 기록'}`:'연결을 기다리는 중';
   $('#tower-link').href=demo?'/?view=tower':towerUrl();
 }
 function refreshDetail(){
   if(!demo&&!latest){detail('실제 작업을 불러오는 중입니다','Codex의 프로젝트와 직원 정보를 연결하고 있어요.');return;}
+  if(scene.selectedOwner){$('#session-detail').hidden=true;detail(`${scene.executive.ownerName} · CEO`,'팀을 살펴보고 업무 진행 상황을 조율하고 있습니다.');return;}
   if(selectedSession){
     const actor=scene.actors.find(a=>a.id===selectedSession),session=demo?actor?.session:latest?.sessions.find(s=>s.id===selectedSession);
     if(actor||session){
       const name=session?.identity?.name||actor?.name,p=projects.find(p=>p.key===(session?.projectKey||actor?.project.key));
-      detail(`${name} · ${p?.name||session?.project||actor.project.name}`,session?(session.active?session.label:'휴식 · '+(session.finished?'작업을 마쳤어요':'최근 활동을 기다리는 중')):`${roomName(actor.seat.room)}에서 함께 일하고 있습니다.`);
+      detail(`${name} · ${p?.name||session?.project||actor.project.name}`,session?(session.active?session.label:inactiveStatus(session)):`${roomName(actor.seat.room)}에서 함께 일하고 있습니다.`);
       $('#session-detail').hidden=demo;$('#session-detail strong').textContent=`${name} · ${p?.name||session?.project}`;
-      $('#session-detail p').textContent=session?`${session.hasParent?'서브에이전트':'일반 채팅'} · ${session.active?session.label:'휴식'} · 마지막 활동 ${timeText(session.updatedAt)}${session.error?' · 도구 결과 확인 필요':''}`:'';
+      $('#session-detail p').textContent=session?`${session.hasParent?'서브에이전트':'일반 채팅'} · ${session.active?session.label:inactiveStatus(session)} · 마지막 활동 ${timeText(session.updatedAt)}${session.error?' · 도구 결과 확인 필요':''}`:'';
       $('#session-tower-link').href=towerUrl(session?.projectKey,selectedSession);return;
     }
     selectedSession=null;
@@ -70,14 +72,15 @@ function renderRoster(){
   const list=$('#session-list');list.replaceChildren();
   for(const session of sessions){
     const p=projects.find(p=>p.key===session.projectKey),button=document.createElement('button');button.className='session-card';button.dataset.session=session.id;button.classList.toggle('selected',selectedSession===session.id);button.setAttribute('aria-pressed',String(selectedSession===session.id));
-    const dot=document.createElement('i'),copy=document.createElement('span'),name=document.createElement('strong'),task=document.createElement('small'),status=document.createElement('span');dot.style.background=p?.color||'#91a678';name.textContent=`${session.identity?.name||'Codex'} · ${p?.name||session.project}`;task.textContent=session.active?session.label:'휴식 · 마지막 활동 '+timeText(session.updatedAt);status.textContent=session.error?'확인':session.active?'작업 중':'휴식';status.className=session.error?'error':session.active?'active':'idle';copy.append(name,task);button.append(dot,copy,status);button.addEventListener('click',()=>chooseActor(session.id));list.append(button);
+    const dot=document.createElement('i'),copy=document.createElement('span'),name=document.createElement('strong'),task=document.createElement('small'),status=document.createElement('span');dot.style.background=p?.color||'#91a678';name.textContent=`${session.identity?.name||'Codex'} · ${p?.name||session.project}`;task.textContent=session.active?session.label:`${inactiveStatus(session)} · 마지막 활동 ${timeText(session.updatedAt)}`;status.textContent=session.error?'확인':session.active?'작업 중':session.finished?'완료':'응답 대기';status.className=session.error?'error':session.active?'active':'idle';copy.append(name,task);button.append(dot,copy,status);button.addEventListener('click',()=>chooseActor(session.id));list.append(button);
   }
   if(!sessions.length){const empty=document.createElement('p');empty.className='roster-empty';empty.textContent=latest?'이 조건에 맞는 최근 작업이 없어요.':'실제 작업을 불러오는 중입니다.';list.append(empty);}
 }
-function markRoom(key){$('#overview').classList.toggle('selected',!key&&!selectedSession);$('#overview').setAttribute('aria-pressed',String(!key&&!selectedSession));$$('.room-row').forEach(b=>{const selected=b.dataset.room===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
+function markRoom(key){$('#overview').classList.toggle('selected',!key&&!selectedSession&&!scene.selectedOwner);$('#overview').setAttribute('aria-pressed',String(!key&&!selectedSession&&!scene.selectedOwner));$$('.room-row').forEach(b=>{const selected=b.dataset.room===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
 function overview(){selectedRoom=null;selectedSession=null;scene.resetView();markRoom(null);refreshDetail();renderRoster();renderCounts();}
 function chooseRoom(key){selectedRoom=key;selectedSession=null;scene.selectRoom(key);markRoom(key);refreshDetail();renderRoster();renderCounts();announce(`${roomName(key)} 확대`);}
 function chooseActor(id){selectedRoom=null;selectedSession=id;scene.selectActor(scene.actors.some(a=>a.id===id)?id:null);markRoom(null);refreshDetail();renderRoster();renderCounts();}
+function chooseOwner(){selectedRoom=null;selectedSession=null;scene.selectOwner();markRoom(null);refreshDetail();renderRoster();renderCounts();if(scene.selectedOwner)announce('CEO 확대');}
 function chooseProject(key){project=key;selectedSession=null;selectedRoom=null;scene.selectActor(null);scene.setProject(key);markRoom(null);renderProjects();renderCounts();refreshDetail();renderRoster();}
 function applyLive(){
   projects=sharedProjects(latest||{sessions:[],projects:[]},registry.floors||{});if(latest&&project&&!projects.some(p=>p.key===project))project=null;
@@ -113,7 +116,7 @@ function toggleDemo(){
 try{
   const preferences=stored('my-ai-office-preferences');
   scene=new SharedOfficeScene($('#study-canvas'),{
-    onRoom:chooseRoom,onActor:chooseActor,preferences,
+    onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,preferences,
     onView:({zoom,elevation})=>{$('#zoom-label').textContent=`${Math.round(zoom*100)}%`;$$('[data-angle]').forEach(b=>{const selected=Math.abs(Number(b.dataset.angle)-elevation)<4;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});},
     onWalkEnd:()=>{if(demo){$('#walk-preview').setAttribute('aria-pressed','false');$('#walk-preview').lastChild.textContent=' 직원 동선 보기';}},
   });

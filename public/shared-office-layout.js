@@ -1,4 +1,5 @@
 import {EXECUTIVE_WALLS,EXECUTIVE_DOOR_LEAVES,EXECUTIVE_FURNITURE} from './office-executive.js';
+import {CELL_SIZE,OFFICE_BOUNDS} from './office-navigation.js';
 
 // Space study: shared process zones and repeatable furniture pods, in metres.
 export const SHARED_BOUNDS={minX:-20,maxX:20,minZ:-12,maxZ:12};
@@ -135,7 +136,14 @@ export function createSharedLayout(scenario='full'){
   const edgeInset=.8,meetingEnd=rooms.find(r=>r.key==='meeting').bounds[3],loungeEnd=rooms.find(r=>r.key==='desk').bounds[3];
   const courtyardStart=Math.max(meetingEnd,loungeEnd)+3;
   bounds.maxZ=Math.ceil((courtyardStart+14+edgeInset)/.4)*.4;
-  const executive={x:bounds.minX+edgeInset+7.8,z:courtyardStart+7,rotation:Math.PI};
+  // After the half turn, preserve the tower navigator's grid centers in the
+  // shared grid. A half-cell offset otherwise strands the secretary behind
+  // her desk and disconnects the lounge despite their open passages.
+  const alignSuite=(value,localMin,sharedMin)=>{
+    const phase=localMin+sharedMin+CELL_SIZE;
+    return phase+Math.ceil((value-phase)/CELL_SIZE-1e-8)*CELL_SIZE;
+  };
+  const executive={x:alignSuite(bounds.minX+edgeInset+7.8,OFFICE_BOUNDS.minX,bounds.minX),z:alignSuite(courtyardStart+7,OFFICE_BOUNDS.minZ,bounds.minZ),rotation:Math.PI};
   executive.bounds=[executive.x-7.8,executive.x+12,executive.z-7,executive.z+7];
   const park={bounds:[4.4,18.4,courtyardStart+.2,courtyardStart+13.4],
     beds:[[5,15,courtyardStart+2.9,courtyardStart+5.7],[5,15,courtyardStart+8.4,courtyardStart+11.1]],
