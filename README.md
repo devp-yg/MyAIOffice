@@ -2,57 +2,20 @@
 
 My AI Office is a local dashboard that visualizes Codex activity as a 3D office. It runs on your computer and reads local Codex session metadata to show projects, staff, and activity.
 
-## Run from source
+## Run the app
 
-Requirements:
+Extract the downloaded project or release ZIP, then launch the file for your computer:
 
-- A Windows or macOS version supported by Node.js 24 or later.
-- Node.js 24 or later. The Node.js installer includes `npm`.
-- Git to clone the repository, or a ZIP utility to extract a downloaded source archive.
+- **Windows:** Double-click `Start My AI Office.bat`.
+- **macOS:** Double-click `Start My AI Office.command`. If macOS asks you to confirm, choose **Open**.
 
-Download Node.js from <https://nodejs.org/> and install the current 24.x release or later. Then clone or download this repository and open a terminal in the project folder (the folder containing `package.json`). There are no npm packages to install for running the app.
+The launcher starts the local server and opens <http://127.0.0.1:4173> in your browser. Leave the server window open while using the office. On Windows, close the minimized server window to stop it; on macOS, close the Terminal window running the server.
 
-### Windows
+### Node.js requirement
 
-1. Install Node.js 24 or later from <https://nodejs.org/>. If a terminal was already open during installation, close and reopen it so it can find `node` and `npm`.
-2. Open **PowerShell** and change to the project folder. For example:
+The source repository and source ZIP do not include Node.js. Install Node.js 24 or later from <https://nodejs.org/> before launching either file. There are no npm packages to install. A complete release ZIP can include its own Node.js runtime, so it can run without a separate Node.js installation.
 
-   ```powershell
-   cd "$HOME\Projects\MyAIOffice"
-   ```
-
-   If you downloaded a ZIP, use the path where you extracted it.
-3. Check that Node.js is available, then start the app:
-
-   ```powershell
-   node --version
-   npm start
-   ```
-
-   `node --version` should print `v24` or a later version. If Windows says `node` or `npm` is not recognized, reopen the terminal or rerun the Node.js installer and enable its PATH option.
-
-### macOS
-
-1. Install Node.js 24 or later from <https://nodejs.org/>. If you use a Node version manager, select version 24 or later in the terminal where you will run the app.
-2. Open **Terminal** and change to the project folder. For example:
-
-   ```sh
-   cd ~/Projects/MyAIOffice
-   ```
-
-   If you downloaded a ZIP, use the path where you extracted it.
-3. Check that Node.js is available, then start the app:
-
-   ```sh
-   node --version
-   npm start
-   ```
-
-   `node --version` should print `v24` or a later version.
-
-### Open and stop the app
-
-Once the terminal says the server is running, open <http://127.0.0.1:4173> in your browser. Keep the terminal window open while using the app. Press **Ctrl+C** in that window to stop the server.
+If the launcher says Node.js 24 or later is required, install or update Node.js and run the launcher again. The macOS launcher supports Apple silicon and Intel Macs.
 
 The server listens on the loopback interface, so it is available only on the computer running it. No account, external font, analytics service, or cloud connection is required.
 
