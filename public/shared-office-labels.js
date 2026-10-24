@@ -17,8 +17,8 @@ export function labelConnector(anchor,box){
 }
 
 export function followLabelAnchor(anchor,size,viewport,previousBox,previousAnchor){
-  const maxX=Math.max(8,viewport.width-size.w-8),maxY=Math.max(8,viewport.height-size.h-8);
-  return {x:clamp(anchor.x+previousBox.x-previousAnchor.x,8,maxX),y:clamp(anchor.y+previousBox.y-previousAnchor.y,8,maxY),...size};
+  const maxX=Math.max(8,viewport.width-size.w-8);
+  return {x:clamp(anchor.x+previousBox.x-previousAnchor.x,8,maxX),y:anchor.y+previousBox.y-previousAnchor.y,...size};
 }
 
 export function projectHead(model,camera,width,height){
@@ -33,14 +33,14 @@ export function projectHead(model,camera,width,height){
 }
 
 export function placeLabel(anchor,size,viewport,placed=[],previous=-1){
-  const {w,h}=size,padding=8;
-  const maxX=Math.max(padding,viewport.width-w-padding),maxY=Math.max(padding,viewport.height-h-padding);
-  // Search only in the immediate neighbourhood, never across the whole office.
-  const candidates=[[0,-12],[-36,-12],[36,-12],[-72,-12],[72,-12],[0,-44],[-48,-44],[48,-44],
-    [-w/2-12,h/2],[w/2+12,h/2],[0,h+12]];
+  const {w,h}=size,padding=8,gap=20,step=h+gap;
+  const maxX=Math.max(padding,viewport.width-w-padding);
+  // Labels stay centered over their owner. Crowded labels stack vertically
+  // above the head instead of moving beside or below the employee.
+  const candidates=Array.from({length:12},(_,index)=>[0,-gap-index*step]);
   let best;
   candidates.forEach(([dx,dy],index)=>{
-    const box={x:clamp(anchor.x-w/2+dx,padding,maxX),y:clamp(anchor.y-h+dy,padding,maxY),w,h};
+    const box={x:clamp(anchor.x-w/2+dx,padding,maxX),y:anchor.y-h+dy,w,h};
     const connector=labelConnector(anchor,box),distance=Math.hypot(connector.x-anchor.x,connector.y-anchor.y);
     let overlap=0;
     for(const other of placed){
