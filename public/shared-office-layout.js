@@ -211,9 +211,11 @@ export function createSharedLayout(scenario='full'){
     const approach={x:x+Math.sin(rotation)*1.25,z:z+Math.cos(rotation)*1.25};
     landscape.benches.push({...bench,approach});
     const horizontal=Math.abs(Math.cos(rotation))>.5;
+    const front={x:approach.x+Math.sin(rotation)*1.3,z:approach.z+Math.cos(rotation)*1.3};
+    // End the bay at the bench, avoiding an isolated walkable pocket behind it.
     paths.push({id:`rest-${id}`,bounds:horizontal?
-      [x-1.9,x+1.9,Math.min(z,approach.z+Math.min(0,Math.cos(rotation))*1.3),Math.max(z,approach.z+Math.max(0,Math.cos(rotation))*1.3)]:
-      [Math.min(x,approach.x+Math.min(0,Math.sin(rotation))*1.3),Math.max(x,approach.x+Math.max(0,Math.sin(rotation))*1.3),z-1.9,z+1.9]});
+      [x-1.9,x+1.9,Math.min(z,front.z),Math.max(z,front.z)]:
+      [Math.min(x,front.x),Math.max(x,front.x),z-1.9,z+1.9]});
   };
   for(const [i,x]of [-24,-9.6,-2.4,19.4,26].entries()){
     rest(`concourse-${i}`,x,3.8,Math.PI);

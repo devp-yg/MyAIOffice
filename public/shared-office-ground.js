@@ -104,7 +104,8 @@ export function buildSharedGround(parent,layout){
     make(cyl,glow,x,.11,z-.4,.1,.045,.1);
   }
   for(const {x,z,w,rotation}of landscape.benches){
-    surface([x-1.75,x+1.75,z-.65,z+.65],'#d3c3a5',.06,.35);
+    const across=Math.abs(Math.cos(rotation))>.5,halfX=across?1.75:.65,halfZ=across?.65:1.75;
+    surface([x-halfX,x+halfX,z-halfZ,z+halfZ],'#d3c3a5',.06,.35);
     const bench=new THREE.Group();bench.position.set(x,0,z);bench.rotation.y=rotation;group.add(bench);
     const part=(color,lx,y,lz,width,height,depth)=>{
       const mesh=new THREE.Mesh(cube,mat(color));mesh.position.set(lx,y,lz);mesh.scale.set(width,height,depth);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.landscape=true;bench.add(mesh);return mesh;

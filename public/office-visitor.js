@@ -57,13 +57,36 @@ export class SpouseWatch {
     const stops=[layout?.circulation.hub,{x:-16,z:0},{x:16,z:0},...(layout?.circulation.paths||[]).filter(path=>['main-concourse','central-promenade','courtyard-forecourt','garden-north','garden-east','garden-south'].includes(path.id)).map(({bounds:[x0,x1,z0,z1]})=>({x:(x0+x1)/2,z:(z0+z1)/2})),
       layout?.circulation.gardenVisit,layout?{x:17.2,z:layout.park.bounds[2]+1.1}:null,layout?{x:17.2,z:layout.park.bounds[3]-1}:null].filter(Boolean);
     this.roamStops=[...new Set(stops.map(point=>nav.nearest(point)).filter(index=>index>=0))].map(index=>nav.point(index));this.roamIndex=0;this.pause=0;
+    this.restStops=(layout?.circulation.restStops||[]).filter(stop=>nav.isWalkable(stop));
+    this.restTarget=null;this.restingSeat=null;this.walkingTime=0;this.lastRestId=null;this.resumeStop=null;
   }
   stroll(dt){
     this.facing=null;this.lastPair=null;this.lastSecretary=null;this.anchor=null;this.replanIn=0;
     const w=this.walker;
     if(this.state!=='strolling'&&this.state!=='resting'){this.stop();this.pause=0;}
-    if(w.walking){w.tick(dt,1.35);this.state=w.walking?'strolling':'resting';if(!w.walking)this.pause=3;return;}
+    if(w.walking){
+      this.walkingTime+=dt;
+      if(!this.restTarget&&this.walkingTime>=10){
+        const stops=this.restStops.filter(stop=>stop.id!==this.lastRestId).sort((a,b)=>distance(w.position,a)-distance(w.position,b));
+        for(const stop of stops){
+          if(!this.navigator.findPath(w.position,stop).length)continue;
+          this.resumeStop={...w.destination};this.restTarget=stop;w.setDestination(stop,null);break;
+        }
+      }
+      w.tick(dt,1.35);this.state=w.walking?'strolling':'resting';
+      if(!w.walking){
+        this.restingSeat=this.restTarget&&distance(w.position,this.restTarget)<.7?this.restTarget:null;
+        this.pause=this.restingSeat?12:3;
+        if(this.restingSeat){this.lastRestId=this.restingSeat.id;this.walkingTime=0;}
+      }
+      return;
+    }
     this.pause-=dt;if(this.pause>0){this.state='resting';return;}
+    this.restingSeat=null;this.restTarget=null;
+    if(this.resumeStop){
+      const target=this.resumeStop;this.resumeStop=null;
+      if(distance(w.position,target)>1){w.setDestination(target,null);if(w.walking){this.state='strolling';return;}}
+    }
     for(let attempt=0;attempt<this.roamStops.length;attempt++){
       const point=this.roamStops[this.roamIndex++%this.roamStops.length];
       if(distance(w.position,point)<1)continue;
@@ -150,7 +173,7 @@ export class SpouseWatch {
     // Only their proximity triggers jealousy. When they separate, immediately
     // release the stare and resume her own road-only stroll.
     if(pair?.insideOffice||!pair?.active||distance(pair.owner,pair.secretary)>SPOUSE_TRIGGER_DISTANCE){this.stroll(dt);return;}
-    if(this.state==='strolling'||this.state==='resting'){this.stop();this.pause=0;this.replanIn=0;}
+    if(this.state==='strolling'||this.state==='resting'){this.stop();this.pause=0;this.replanIn=0;this.restTarget=null;this.restingSeat=null;this.walkingTime=0;this.resumeStop=null;}
     this.facing={...pair.secretary};this.replanIn-=dt;
     const near=Math.min(distance(w.position,pair.owner),distance(w.position,pair.secretary));
     const far=Math.max(distance(w.position,pair.owner),distance(w.position,pair.secretary));
@@ -174,8 +197,8 @@ export class SpouseWatch {
     }
     this.state=w.walking?'following':!traveling&&settled?'watching':'observing';
   }
-  get text(){return {waiting:'산책을 준비하는 중',strolling:'혼자 여유롭게 공용 통로를 산책하는 중',resting:'집무실에서 떨어진 공용 공간에서 잠시 쉬는 중',following:'가까워진 남편과 비서에게 눈치를 주러 가는 중',watching:'적당히 떨어져 비서를 빤히 보며 눈치 주는 중',observing:'비서의 움직임을 유심히 지켜보는 중'}[this.state];}
-  get summary(){return {waiting:'남편 기다림',strolling:'공용층 산책',resting:'산책 중 휴식',following:'남편 따라감',watching:'비서 견제',observing:'비서 주시'}[this.state];}
+  get text(){if(this.restingSeat)return '산책로 벤치에 앉아 편안하게 쉬는 중';return {waiting:'산책을 준비하는 중',strolling:'혼자 여유롭게 공용 통로를 산책하는 중',resting:'집무실에서 떨어진 공용 공간에서 잠시 쉬는 중',following:'가까워진 남편과 비서에게 눈치를 주러 가는 중',watching:'적당히 떨어져 비서를 빤히 보며 눈치 주는 중',observing:'비서의 움직임을 유심히 지켜보는 중'}[this.state];}
+  get summary(){if(this.restingSeat)return '벤치에서 휴식';return {waiting:'남편 기다림',strolling:'공용층 산책',resting:'산책 중 휴식',following:'남편 따라감',watching:'비서 견제',observing:'비서 주시'}[this.state];}
 }
 
 export class OfficeVisitor {
@@ -199,9 +222,10 @@ export class OfficeVisitor {
     else if(this.routine.sourceNavigator!==navigator||this.routine.executive!==navigator.executive||this.context!==pair?.context)this.routine.bind(navigator,{preserve:this.context===pair?.context&&this.routine.executive===navigator.executive});
     this.context=pair?.context;this.routine.tick(dt,pair);
     const {walker}=this.routine,{model}=this,walking=walker.walking;
-    model.root.position.set(walker.position.x,0,walker.position.z);
+    const seated=this.routine.restingSeat,bench=seated?.bench;
+    model.root.position.set(bench?bench.x+Math.sin(seated.heading)*.12:walker.position.x,0,bench?bench.z+Math.cos(seated.heading)*.12:walker.position.z);
     const face=this.routine.facing,watching=Boolean(face),direction=face?Math.atan2(face.x-walker.position.x,face.z-walker.position.z):model.root.rotation.y;
-    const heading=walking?walker.heading:direction;
+    const heading=walking?walker.heading:seated?seated.heading:direction;
     const turn=Math.atan2(Math.sin(heading-model.root.rotation.y),Math.cos(heading-model.root.rotation.y));
     model.root.rotation.y+=turn*Math.min(1,dt*7);
     const headTurn=watching?Math.atan2(Math.sin(direction-model.root.rotation.y),Math.cos(direction-model.root.rotation.y)):0;
@@ -210,7 +234,8 @@ export class OfficeVisitor {
     if(model.smile)model.smile.visible=!watching;
     const stride=motion&&walking?Math.sin(walker.distanceWalked*10):0;
     model.body.position.y=motion?(walking?Math.abs(stride)*.018:Math.sin(time*.0018)*.006):0;
-    model.legL.rotation.x=stride*.28;model.legR.rotation.x=-stride*.28;
+    if(seated)model.body.position.y+=.22;
+    model.legL.rotation.x=seated?-1.1:stride*.28;model.legR.rotation.x=seated?-1.1:-stride*.28;
     model.armL.rotation.set(watching&&!walking?-.45:-stride*.18,0,watching&&!walking?.6:-.06);
     model.armR.rotation.set(-.65,0,-.35);
     model.eyes.scale.y=motion&&time%5600>5460?.12:watching?.5:1;
