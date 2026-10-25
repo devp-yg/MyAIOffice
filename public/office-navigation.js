@@ -93,7 +93,7 @@ export class OfficeNavigator {
   }
   nearest(point,room=null){let best=-1,bestDistance=Infinity;for(let i=0;i<this.free.length;i++){if(!this.free[i])continue;const candidate=this.point(i);if(room&&roomAt(candidate,this.roomLayout)!==room)continue;const d=distance(point,candidate);if(d<bestDistance){best=i;bestDistance=d;}}return best;}
   station(room,index=0){const spots=this.workSpots[room]||this.workSpots.desk;const [x,z]=spots[index%spots.length];return this.point(this.nearest({x,z},room));}
-  findPath(start,end){
+  findPath(start,end,{avoid=[],clearance=0}={}){
     const first=this.nearest(start),last=this.nearest(end);
     if(first<0||last<0)return [];
     if(first===last)return [this.point(first)];
@@ -108,6 +108,7 @@ export class OfficeNavigator {
       for(const next of this.neighbors(current)){
         if(!this.free[next]||closed.has(next))continue;
         if(this.regions?.[next]&&!allowedRegions.has(this.regions[next]))continue;
+        if(clearance>0&&avoid.length){const point=this.point(next);if(avoid.some(origin=>(point.x-origin.x)**2+(point.z-origin.z)**2<clearance**2))continue;}
         const score=g.get(current)+1;
         if(score>=(g.get(next)??Infinity))continue;
         previous.set(next,current);g.set(next,score);f.set(next,score+this.heuristic(next,last));

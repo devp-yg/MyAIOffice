@@ -123,3 +123,8 @@ body.evening{color-scheme:dark;--bg:#1d2826;--surface:#25332e;--ink:#e1e8d9;--mu
 .world-agent-label.secretary-label>.secretary-action{max-width:132px;font-size:10px!important;line-height:1.3!important}
 .executive-scene .world-agent-label.secretary-label strong,.executive-scene .world-agent-label.secretary-label strong>span{color:#53674a!important}
 .world-agent-label.secretary-label>.secretary-action,.executive-scene .world-agent-label.secretary-label>.secretary-action{color:#52634f!important}
+.world-agent-label.visitor-label{background:#fff5f8ed;border-color:#d8afbf;max-width:176px}
+.world-agent-label.visitor-label strong{color:#81566c;font-size:11px}
+.world-agent-label.visitor-label small{display:block;margin-top:2px;color:#9b7086;font-size:9px}
+.world-agent-label.visitor-label>.study-agent-action{font-size:10px;color:#7c6772}
+.world-agent-label.visitor-label[data-state=watching]{background:#fbe9f0f5;border-color:#ad617f;box-shadow:0 0 0 1px #ad617f33,0 3px 8px #81566c18}

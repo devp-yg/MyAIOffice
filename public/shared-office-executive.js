@@ -56,6 +56,9 @@ export class SharedExecutiveWing {
     this.sharedNavigator=navigator;
   }
   point(x,y,z){return this.root.localToWorld(new THREE.Vector3(x,y,z));}
+  spouseTargets(){
+    return {context:'shared',insideOffice:Boolean(!this.assisting&&this.owner.root.visible),active:Boolean(this.assisting&&this.owner.root.visible&&this.companion.root.visible),owner:this.ownerWalker?.position,secretary:this.companionWalker?.position,heading:this.ownerWalker?.walking?this.ownerWalker.heading:this.owner.root.rotation.y,ownerWalking:Boolean(this.ownerWalker?.walking),secretaryHeading:this.companionWalker?.heading,walking:Boolean(this.ownerWalker?.walking||this.companionWalker?.walking)};
+  }
   update(dt,time,motion,actors=[]){
     const today=secretaryLookForDate();
     if(today.day!==this.secretaryLook.day){

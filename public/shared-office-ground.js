@@ -56,7 +56,7 @@ export function buildSharedGround(parent,layout){
   const surface=(rect,color,y,r=.4)=>{const g=ownGeometry(new THREE.ShapeGeometry(roundedRect(rect,r),10));g.rotateX(Math.PI/2);const m=mat(color);m.side=THREE.DoubleSide;return make(g,m,0,y,0);};
   const texture=room=>{const kind=['library','meeting','desk'].includes(room)?'wood':room==='server'?'technical':'stone';if(!textures.has(kind))textures.set(kind,floorTexture(kind));return textures.get(kind);};
   const glow=new THREE.MeshStandardMaterial({color:0xffe3ac,emissive:0xffd18b,emissiveIntensity:.04,roughness:.6});materials.add(glow);
-  const {park,circulation,executive,rooms}=layout;
+  const {park,landscape,circulation,executive,rooms}=layout;
   surface(park.bounds,'#ddd9ca',-.007,.8);
   const {cells,edges}=circulationSurface(circulation.paths,[...rooms.map(room=>room.bounds),executive.bounds]);
   const vertices=[],uv=[];
@@ -70,30 +70,54 @@ export function buildSharedGround(parent,layout){
     const length=Math.hypot(b[0]-a[0],b[1]-a[1]);if(length<1.6)continue;
     for(let d=.8;d<length;d+=2.8){const t=d/length,x=a[0]+(b[0]-a[0])*t,z=a[1]+(b[1]-a[1])*t;make(cube,glow,x,.052,z,a[0]===b[0]?.045:.28,.014,a[0]===b[0]?.28:.045);}
   }
-  // Two planted islands leave the entry axis and the complete loop open.
-  for(const bed of park.beds){
-    surface([bed[0]-.12,bed[1]+.12,bed[2]-.12,bed[3]+.12],'#c5bda6',.065,.65);
-    surface(bed,'#a8bd91',.085,.55);
-    for(let x=bed[0]+.5;x<bed[1]-.3;x+=.65){make(sphere,mat('#8ea77d'),x,.17,bed[2]+.23,.24,.12,.17);}
+  // Gravel margins, meadow planting and timber seats repeat along the streets
+  // as well as the courtyard, with all solid footprints shared by navigation.
+  const beds=[...park.beds,...landscape.beds];
+  for(const [index,bed]of beds.entries()){
+    surface([bed[0]-.12,bed[1]+.12,bed[2]-.12,bed[3]+.12],'#bdb69e',.065,.45);
+    surface(bed,'#d5cfba',.085,.38);
+    surface([bed[0]+.17,bed[1]-.17,bed[2]+.17,bed[3]-.17],'#a5b98b',.09,.3);
+    const width=bed[1]-bed[0],depth=bed[3]-bed[2];
+    for(let k=0;k<28;k++){
+      const t=(k+.5)/28,x=k%2?bed[0]+.1:bed[1]-.1,z=bed[2]+t*depth;
+      make(sphere,mat(['#b8b2a2','#eee6d5','#c5bda9'][k%3]),x,.12,z,.055+(k%3)*.012,.035,.065);
+    }
+    for(let k=0;k<Math.max(8,Math.ceil(width*depth*1.2));k++){
+      const x=bed[0]+.25+((k*.61803398875+index*.37)%1)*(width-.5),z=bed[2]+.3+((k*.41421356237)%1)*(depth-.6);
+      const green=['#718c62','#8fa976','#a6b68a'][k%3];
+      make(sphere,mat(green),x,.21,z,.16,.14,.17);
+      for(let blade=0;blade<3;blade++){
+        const grass=box(green,x+(blade-1)*.065,.32,z,.025,.32,.025);grass.rotation.z=(blade-1)*.22;
+      }
+      if(k%2===0){
+        const color=['#efe4ba','#c6aecb','#d4a396','#f4edd9'][k%4];
+        make(cyl,mat('#6b8957'),x,.34,z,.014,.4,.014);
+        make(sphere,mat(color),x,.55,z,.105,.055,.105);
+        make(sphere,mat('#dbbd79'),x,.59,z,.04,.03,.04);
+      }
+    }
   }
-  for(const [x,z,size]of park.trees){
+  for(const [x,z,size]of [...park.trees,...landscape.trees]){
     make(cyl,mat('#8e7456'),x,.85,z,.09*size,1.7,.09*size);
     for(const [dx,dy,dz,r]of [[0,0,0,.85],[-.45,.3,.12,.62],[.4,.1,-.1,.67]]){const canopy=make(sphere,mat(dx<0?'#8da57b':'#78966b'),x+dx*size,2.05+dy*size,z+dz*size,r*size,.68*size,r*size);canopy.castShadow=true;}
     const light=new THREE.PointLight(0xffd9a1,0,5.2,2);light.position.set(x,.45,z);group.add(light);fixtures.push({light,intensity:.58});
     make(cyl,glow,x,.11,z-.4,.1,.045,.1);
   }
-  for(const [x,z,rotation]of park.benches){
-    // Timber decks and benches sit inside the planting boundary, beside the path.
-    const deck=surface([x-1.6,x+1.6,z-.38,z+.38],'#bfab86',.095,.12);deck.material.map=texture('desk');
-    for(let i=0;i<6;i++){const b=box('#baa17c',x,.58,z-.25+i*.1,2.65,.1,.085);b.rotation.y=rotation;}
-    box('#7a8873',x-1,.28,z,.1,.5,.48);box('#7a8873',x+1,.28,z,.1,.5,.48);
+  for(const {x,z,w,rotation}of landscape.benches){
+    surface([x-1.75,x+1.75,z-.65,z+.65],'#d3c3a5',.06,.35);
+    const bench=new THREE.Group();bench.position.set(x,0,z);bench.rotation.y=rotation;group.add(bench);
+    const part=(color,lx,y,lz,width,height,depth)=>{
+      const mesh=new THREE.Mesh(cube,mat(color));mesh.position.set(lx,y,lz);mesh.scale.set(width,height,depth);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.landscape=true;bench.add(mesh);return mesh;
+    };
+    for(let i=0;i<5;i++)part('#b89b73',0,.51,-.28+i*.14,w,.1,.115);
+    for(let i=0;i<3;i++)part('#c3a780',0,.77+i*.14,-.34,w,.105,.09);
+    for(const side of [-1,1]){
+      part('#637866',side*(w/2-.23),.29,0,.1,.46,.58);
+      part('#637866',side*(w/2-.23),.75,-.04,.075,.52,.075);
+      part('#b89b73',side*(w/2-.23),.82,.02,.12,.08,.63);
+    }
   }
-  // Low shrubs and muted flowers add detail without filling the walking lanes.
-  for(const [i,bed]of park.beds.entries())for(let k=0;k<8;k++){
-    const x=bed[1]-.45-k*.32,z=bed[3]-.35;
-    make(sphere,mat(k%3===0?'#d6bb92':i?'#a7a6ba':'#c1aa99'),x,.22,z,.11,.16,.11);
-  }
-  const junctions=[[layout.circulation.hub.x,0],[2.7,5.4],[2.7,11.5],[2.7,executive.z]];
+  const junctions=[[layout.circulation.hub.x,0],[2.7,7],[2.7,14.2],[2.7,executive.z]];
   for(const [x,z]of junctions){const light=new THREE.PointLight(0xffdfa8,0,5,2);light.position.set(x,.7,z);group.add(light);fixtures.push({light,intensity:.4});}
   return {group,texture,
     updateLighting(darkness){glow.emissiveIntensity=.035+darkness*.8;for(const fixture of fixtures)fixture.light.intensity=darkness*fixture.intensity;},

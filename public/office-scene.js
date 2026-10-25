@@ -5,6 +5,7 @@ import { SECRETARY_STATION, EXECUTIVE_INTERACTIONS } from './office-executive.js
 import { OfficeNavigator, OfficeWalker, roomAt, ROOM_LAYOUT, EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_WALLS, WALLS, DOORS, FURNITURE } from './office-navigation.js';
 import { SecretaryRoutine, SECRETARY_STOPS } from './office-secretary.js';
 import { daylightAt, sunriseSunset } from './solar-time.js';
+import { OfficeVisitor } from './office-visitor.js';
 
 const PALETTES={studio:0x8fae83,library:0xd0ad76,server:0x89a9c7,research:0x83b3a2,meeting:0xb39ace,desk:0xd9ab83};
 const SECRETARY_LOOKS=[
@@ -70,19 +71,25 @@ export function createCharacter(parent,palette='studio',appearance={}){
  const characterIndex=Number(appearance.index)||0,styleIndex=characterIndex%8,variant=Math.floor(characterIndex/8)%4;const baseCoat=PALETTES[palette]||PALETTES.studio;
  // A stable appearance cycle gives employees different silhouettes while keeping a
  // small share of the team visibly feminine. Their index stays the same in both views.
- const feminineStyle=!appearance.secretary&&!appearance.owner&&characterIndex%5===2?(Math.floor(characterIndex/5)%2?'ponytail':'bob'):null;
+ const feminineStyle=appearance.pregnant?'ponytail':!appearance.secretary&&!appearance.owner&&characterIndex%5===2?(Math.floor(characterIndex/5)%2?'ponytail':'bob'):null;
  const hairColors=[0x71503a,0x352c29,0x79513a,0x4b4542,0xa4774d,0x6f573f,0x3d302c,0x927b63];
  const skinTones=[0xf0c3a4,0xe4ad8d,0xc98d6c,0xa96f55,0x80513f,0xd5a27d];
  const hairColor=appearance.secretary?0xd4ad52:appearance.owner?0x503f36:hairColors[characterIndex%hairColors.length];
  const skin=appearance.secretary||appearance.owner?0xf0c3a4:skinTones[characterIndex%skinTones.length];
  const coatOffsets=[[-.035,0,-.045],[.025,.02,.025],[-.065,.025,.045],[.055,-.015,-.025],[.01,.045,-.055],[-.045,-.025,.035],[.07,.015,.005],[-.015,-.04,.06]][styleIndex];
  const outfit=appearance.secretaryOutfit||SECRETARY_LOOKS[0];
- const root=group(parent),body=group(root),coat=appearance.owner?0x354f5b:appearance.secretary?outfit.top:new THREE.Color(baseCoat).offsetHSL(coatOffsets[0]+(variant-1.5)*.012,coatOffsets[1],coatOffsets[2]+(variant-1.5)*.022).getHex();
+ const root=group(parent),body=group(root),coat=appearance.pregnant?0xc28da5:appearance.owner?0x354f5b:appearance.secretary?outfit.top:new THREE.Color(baseCoat).offsetHSL(coatOffsets[0]+(variant-1.5)*.012,coatOffsets[1],coatOffsets[2]+(variant-1.5)*.022).getHex();
  const secretaryTrousers=appearance.secretary&&outfit.cut==='trousers';
  const legOffset=appearance.secretary ? .09 : .13;
  const legL=group(body,-legOffset,.30,0),legR=group(body,legOffset,.30,0);
  for(const leg of [legL,legR]){cylinder(leg,appearance.secretary?(secretaryTrousers?outfit.bottom:skin):0x6b7562,0,secretaryTrousers?-.10:-.12,0,appearance.secretary?(secretaryTrousers?.082:.065):.09,secretaryTrousers?.36:.30);ball(leg,appearance.secretary?0x716659:0x635e4f,0,-.25,.065,appearance.secretary?.085:.115,appearance.secretary?.065:.075,appearance.secretary?.15:.17);}
- if(appearance.secretary){
+ let belly=null;
+ if(appearance.pregnant){
+  mesh(body,new THREE.CapsuleGeometry(.22,.24,6,16),coat,0,.66,0,1,1,.95);
+  mesh(body,new THREE.CylinderGeometry(.23,.29,.39,28),coat,0,.42,.025,1,1,.88);
+  belly=ball(body,coat,0,.59,.115,.23,.22,.17);belly.name='maternity-belly';
+  box(body,0xf4e6d8,0,.83,.21,.15,.045,.025,false);
+ }else if(appearance.secretary){
   mesh(body,new THREE.CapsuleGeometry(.22,.16,6,12),coat,0,.725,0,1,.85,1);
   if(outfit.cut==='skirt'){mesh(body,new THREE.CylinderGeometry(.215,.205,.25,28),outfit.bottom,0,.42,0,1,1,.80);mesh(body,cylinderGeometry,new THREE.Color(outfit.bottom).offsetHSL(0,-.08,-.12).getHex(),0,.55,0,.218,.035,.177);}
   else if(outfit.cut==='dress'){
@@ -153,6 +160,11 @@ export function createCharacter(parent,palette='studio',appearance={}){
  for(const x of [-.115,.115]){ball(eyes,0x514e41,x,.035,.298,.028,.040,.018,false);ball(eyes,0xffffff,x+.008,.048,.314,.008,.009,.005,false);ball(head,0xedb9a7,x<0?-.216:.216,-.055,.246,.043,.025,.012,false);}
  ball(head,skin,0,-.025,.312,.033,.045,.035,false);
  const smile=mesh(head,new THREE.TorusGeometry(.044,.009,5,12,Math.PI),0x9b785d,0,-.10,.302,1,1,1,false);smile.rotation.z=Math.PI;
+ const glare=appearance.pregnant?group(head):null;
+ if(glare){
+  for(const side of [-1,1]){const brow=box(glare,hairColor,side*.115,.115,.306,.12,.024,.018,false);brow.rotation.z=side*.28;}
+  box(glare,0x9b785d,0,-.105,.309,.08,.012,.012,false);glare.visible=false;
+ }
  const fringe=ball(head,hairColor,appearance.secretary ? .015 : -.065,.216,.263,appearance.secretary ? .17 : .13,.045,.035,false);fringe.rotation.z=.28;
  if(appearance.secretary){for(const side of [-1,1]){const brow=box(head,0x8d6937,side*.115,.115,.289,.09,.018,.014,false);brow.rotation.z=side*.08;}}
  if(appearance.accessory==='glasses'){const frame=appearance.secretary?0xb18b55:0x76617e;for(const x of [-.115,.115])mesh(head,new THREE.TorusGeometry(.095,.013,6,24),frame,x,.035,.323,1,1,1,false);box(head,frame,0,.035,.327,.04,.015,.015,false);}
@@ -160,7 +172,7 @@ export function createCharacter(parent,palette='studio',appearance={}){
   box(body,0xf9f0d7,0,.77,.215,.19,.24,.035);const tie=box(body,0xd4b650,0,.67,.24,.055,.24,.035);tie.rotation.z=.04;
   cylinder(head,0xd7b94f,0,.35,0,.30,.09);for(let i=0;i<5;i++){const angle=i*Math.PI*2/5;mesh(head,new THREE.ConeGeometry(.07,.22,4),0xe1c563,Math.sin(angle)*.25,.49,Math.cos(angle)*.25);}
   ball(body,0xe2c76d,.16,.76,.23,.07,.07,.025,false);box(body,0x665026,.16,.76,.26,.013,.073,.008,false);
- }else{
+ }else if(!appearance.pregnant){
  if(appearance.secretary){for(const side of [-1,1]){const collar=box(body,0xf4e4db,side*.055,.87,.192,.075,.10,.025,false);collar.rotation.z=side*.25;}if(outfit.style==='blouse')for(const y of [.78,.69,.60])ball(body,0xfff4e6,0,y,.224,.012,.012,.008,false);box(body,0xc4a45c,.14,.78,.218,.075,.045,.018,false);}
   if(styleIndex===0||styleIndex===4)box(body,0xf3edd6,0,.5,.215,.28,.035,.025,false);
   if(styleIndex===1||styleIndex===5)for(const side of [-1,1]){const lapel=box(body,0xf3edd6,side*.075,.78,.218,.10,.20,.018,false);lapel.rotation.z=side*.22;}
@@ -188,7 +200,7 @@ export function createCharacter(parent,palette='studio',appearance={}){
  if(appearance.secretary){for(const [key,options]of Object.entries({teaTray:{},snackTray:{snacks:true},emptyTray:{empty:true}})){props[key]=secretaryTray(body,options);props[key].position.set(0,.72,.42);}const cloth=props.cloth=group(body,.29,.76,.34);box(cloth,0xc8d7c5,0,0,0,.22,.045,.16);box(cloth,0xe8ede1,0,.025,.03,.20,.012,.04,false);}
 
  const selection=mesh(root,new THREE.RingGeometry(.45,.49,36),new THREE.MeshBasicMaterial({color:0x91ad66,side:THREE.DoubleSide,transparent:true,opacity:.8}),0,.025,0);selection.rotation.x=-Math.PI/2;selection.visible=false;
- return {root,body,head,eyes,legL,legR,armL,armR,props,selection};
+ return {root,body,head,eyes,legL,legR,armL,armR,props,selection,belly,glare,smile};
 }
 
 export class OfficeScene {
@@ -210,6 +222,7 @@ export class OfficeScene {
   this.secretaryRoutine=null;this.secretaryRoutineExecutive=null;this.secretaryEscortWalker=null;this.secretaryEscortContext=null;this.secretaryEscortStart=null;this.secretaryEscortTargetIndex=null;this.secretaryEscorting=false;this.secretaryServiceTimers={tea:0,snacks:0};this.secretaryServings={tea:secretaryTray(this.executiveSuiteGroup),snacks:secretaryTray(this.executiveSuiteGroup,{snacks:true})};this.secretaryServings.tea.position.set(-1.02,1.06,-1.65);this.secretaryServings.snacks.position.set(-8.65,.55,-4.35);for(const tray of Object.values(this.secretaryServings))tray.visible=false;
   this.librarianLabel.className='world-agent-label show-task librarian-label';this.librarianLabel.style.pointerEvents='none';this.labelLayer.append(this.librarianLabel);
   this.owner=new OfficeOwner(this,createCharacter);
+  this.visitor=new OfficeVisitor(this.world,this.labelLayer,createCharacter);
   this.routeLine=null;this.routeSignature='';
   this.bindControls();this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(element);this.resize();this.frame=this.frame.bind(this);this.frameHandle=requestAnimationFrame(this.frame);
  }
@@ -486,7 +499,7 @@ export class OfficeScene {
  }
  updateLabels(){
   if(!this.width)return;
-  if(this.archiveMode){for(const {node}of this.labels.values())node.hidden=true;for(const actor of this.actors.values())actor.label.hidden=true;if(this.owner?.label)this.owner.label.hidden=true;this.secretaryLabel.hidden=true;const walk=this.archiveLibrarianWalk,model=this.archiveLibrarian;if(model&&walk){const action=this.librarianLabel.querySelector('span');const text=walk.inspecting?'자료를 살펴보는 중':'서가를 순회하는 중';if(action.textContent!==text){action.textContent=text;this.librarianLabel.setAttribute('aria-label',`모아 · ${text}`);}this.placeLabel(this.librarianLabel,new THREE.Vector3(model.root.position.x,2.45,model.root.position.z));}else this.librarianLabel.hidden=true;return;}
+  if(this.archiveMode){if(this.visitor)this.visitor.label.hidden=true;for(const {node}of this.labels.values())node.hidden=true;for(const actor of this.actors.values())actor.label.hidden=true;if(this.owner?.label)this.owner.label.hidden=true;this.secretaryLabel.hidden=true;const walk=this.archiveLibrarianWalk,model=this.archiveLibrarian;if(model&&walk){const action=this.librarianLabel.querySelector('span');const text=walk.inspecting?'자료를 살펴보는 중':'서가를 순회하는 중';if(action.textContent!==text){action.textContent=text;this.librarianLabel.setAttribute('aria-label',`모아 · ${text}`);}this.placeLabel(this.librarianLabel,new THREE.Vector3(model.root.position.x,2.45,model.root.position.z));}else this.librarianLabel.hidden=true;return;}
   this.librarianLabel.hidden=true;
   for(const [key,{node,point}]of this.labels){if(!this.navigator.roomLayout.some(room=>room.key===key)){node.hidden=true;continue;}this.placeLabel(node,point);}
   for(const actor of this.actors.values()){
@@ -495,6 +508,7 @@ export class OfficeScene {
     this.placeLabel(actor.label,new THREE.Vector3(actor.walker.position.x,2.45,actor.walker.position.z));
   }
   if(this.secretaryModel.root.visible)this.placeLabel(this.secretaryLabel,new THREE.Vector3(this.secretaryModel.root.position.x,2.20,this.secretaryModel.root.position.z));else this.secretaryLabel.hidden=true;
+  if(this.visitor?.model.root.visible)this.placeLabel(this.visitor.label,this.visitor.labelPoint);
   this.layoutLabels();
  }
  placeLabel(node,point){
@@ -504,7 +518,7 @@ export class OfficeScene {
   node.hidden=projected.x< -1.1||projected.x>1.1||projected.y< -1.1||projected.y>1.1;
  }
  layoutLabels(){
-  const nodes=[...this.labels.values()].map(label=>label.node).concat([...this.actors.values()].map(actor=>actor.label),this.secretaryLabel,this.librarianLabel,this.owner?.label||[]);
+  const nodes=[...this.labels.values()].map(label=>label.node).concat([...this.actors.values()].map(actor=>actor.label),this.secretaryLabel,this.librarianLabel,this.owner?.label||[],this.visitor?.label||[]);
   const placed=[];
   const priority=node=>node.classList.contains('selected')?0:node.classList.contains('owner-label')?1:node.classList.contains('world-room-label')?2:node.classList.contains('receiving')?3:node.classList.contains('show-task')?4:5;
   nodes.sort((a,b)=>priority(a)-priority(b));
@@ -540,8 +554,9 @@ export class OfficeScene {
   if(!signature)return;const points=[actor.walker.position,...actor.walker.route].map(p=>new THREE.Vector3(p.x,.065,p.z));const geometry=new THREE.BufferGeometry().setFromPoints(points);const line=new THREE.Line(geometry,new THREE.LineDashedMaterial({color:0xb08a4d,dashSize:.20,gapSize:.15,transparent:true,opacity:.85,depthTest:true}));line.computeLineDistances();line.renderOrder=5;this.world.add(line);this.routeLine=line;
  }
  frame(time){this.frameHandle=requestAnimationFrame(this.frame);const dt=Math.min((time-this.lastTime)/1000,.05);this.lastTime=time;if(document.hidden)return;const date=new Date(),minute=date.getHours()*60+date.getMinutes();if(minute!==this.lightingMinute){this.lightingMinute=minute;if(this.location)this.solarEvents=sunriseSunset(date,this.location.latitude,this.location.longitude);const daylight=daylightAt(date,this.solarEvents||{sunrise:390,sunset:1140});this.sky.intensity=.9+daylight;this.sun.intensity=.45+1.65*daylight;this.scene.background.copy(NIGHT_BACKGROUND).lerp(DAY_BACKGROUND,daylight);}for(const actor of [...this.actors.values()])this.updateActor(actor,dt,time);if(this.archiveMode)this.updateArchiveLibrarian(dt,time);this.owner.update(dt,time);this.updateSecretary(dt,time);for(const light of this.lights){const active=[...this.actors.values()].some(actor=>actor.session.projectKey===this.context&&actor.session.active&&!actor.walker.walking&&actor.desired.room===light.room);light.mesh.material.emissiveIntensity=active?.4+Math.max(0,Math.sin(time*.009+light.offset))*1.6:.15;}
-  this.updateLabels();this.updateRoute();this.renderer.render(this.scene,this.camera);
+  const pair={context:this.context,insideOffice:Boolean(this.owner.model.root.visible&&this.navigator.executive&&roomAt(this.owner.walker.position,EXECUTIVE_ROOM_LAYOUT)==='desk'),active:Boolean(this.secretaryEscorting&&this.owner.model.root.visible&&this.secretaryModel.root.visible&&!this.archiveMode&&this.owner.journey.phase!=='riding'),owner:this.owner.walker.position,secretary:this.secretaryEscortWalker?.position||this.secretaryModel.root.position,heading:this.owner.walker.walking?this.owner.walker.heading:this.owner.model.root.rotation.y,ownerWalking:this.owner.walker.walking,secretaryHeading:this.secretaryEscortWalker?.heading,walking:this.owner.walker.walking||Boolean(this.secretaryEscortWalker?.walking)};
+  this.visitor.update(this.navigator,dt,time,this.motion,!this.archiveMode,pair);this.updateLabels();this.updateRoute();this.renderer.render(this.scene,this.camera);
   const signature=[...this.actors.keys()].map(id=>{const state=this.getStatus(id);return `${id}:${state.phase}:${state.room}:${state.target}`;}).join('|');if(signature!==this.statusSignature){this.statusSignature=signature;this.onStatusChange?.();}
  }
- destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.renderer.dispose();this.element.replaceChildren();}
+ destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.visitor.destroy(disposeCharacter);this.renderer.dispose();this.element.replaceChildren();}
 }

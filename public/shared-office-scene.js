@@ -6,6 +6,7 @@ import {SharedExecutiveWing} from './shared-office-executive.js';
 import {daylightAt,sunriseSunset} from './solar-time.js';
 import {buildSharedGround} from './shared-office-ground.js';
 import {SharedOfficeLabels} from './shared-office-labels.js';
+import {OfficeVisitor} from './office-visitor.js';
 
 const materialCache=new Map();
 const DAY_BACKGROUND=new THREE.Color('#eef2ed'),NIGHT_BACKGROUND=new THREE.Color('#68747d');
@@ -84,6 +85,8 @@ export class SharedOfficeScene {
     this.actorLabels=new SharedOfficeLabels(this.labelLayer);
     this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),selected:()=>this.selectedOwner,summary:()=> '… 대기'});
     this.actorLabels.add(this.executive.secretaryLabel,{model:()=>this.executive.assisting?this.executive.companion:this.executive.secretary,working:()=>true});
+    this.visitor=new OfficeVisitor(this.world,this.labelLayer,createCharacter,{shared:true});
+    this.actorLabels.add(this.visitor.label,{model:()=>this.visitor.model,working:()=>false,summary:()=>this.visitor.routine?.summary||'남편 기다림'});
     // Use the existing office camera gestures and keyboard controls.
     canvas.addEventListener('pointerdown',()=>{this.transition=null;});
     OfficeScene.prototype.bindControls.call(this);
@@ -99,6 +102,7 @@ export class SharedOfficeScene {
     this.lights=[];this.ambientFixtures=[];this.layout=layout;this.navigator=new OfficeNavigator(this.layout);
     this.layoutGroup=new THREE.Group();this.world.add(this.layoutGroup);this.buildSpace();
     this.executive.place(layout.executive,this.navigator);
+    this.visitor.update(this.navigator,0,performance.now(),this.motion,true,this.executive.spouseTargets());
     for(const actor of this.actors){actor.walker.navigator=this.navigator;actor.walker.route=[];actor.walker.pending=null;actor.walker.destination={x:Infinity,z:Infinity};}
     this.renderer.shadowMap.needsUpdate=true;this.resize();
   }
@@ -175,13 +179,13 @@ export class SharedOfficeScene {
     addAmbientFixture(maxX+.28,0,2.15,.42,7);
     addAmbientFixture(this.layout.executive.bounds[1]+1,this.layout.executive.z,2.15,.34,7);
     // A cutaway perimeter gives the office depth without hiding the front rooms.
-    box(root,0xe9e5d8,0,1.35,minZ+.1,40,.15+2.5,.18);box(root,0xd0c5ae,0,.14,minZ+.23,40,.18,.09);
-    for(let x=-18;x<=18;x+=4){box(root,0xcfdfd7,x,1.65,minZ+.23,3.4,1.55,.04);for(const dx of [-1.75,0,1.75])box(root,0xfffbec,x+dx,1.65,minZ+.28,.065,1.65,.07);box(root,0xfffbec,x,2.45,minZ+.28,3.55,.07,.07);}
+    box(root,0xe9e5d8,0,1.35,minZ+.1,width,.15+2.5,.18);box(root,0xd0c5ae,0,.14,minZ+.23,width,.18,.09);
+    for(let x=minX+2;x<=maxX-2;x+=4){box(root,0xcfdfd7,x,1.65,minZ+.23,3.4,1.55,.04);for(const dx of [-1.75,0,1.75])box(root,0xfffbec,x+dx,1.65,minZ+.28,.065,1.65,.07);box(root,0xfffbec,x,2.45,minZ+.28,3.55,.07,.07);}
     box(root,0xe8e6db,minX+.1,.45,centerZ,.16,.9,depth-.2);
     const entryZ=0,entryHalf=1.55,entryX=maxX-.1;
     box(root,0xe8e6db,entryX,.45,(minZ+entryZ-entryHalf)/2,.16,.9,entryZ-entryHalf-minZ);
     box(root,0xe8e6db,entryX,.45,(maxZ+entryZ+entryHalf)/2,.16,.9,maxZ-entryZ-entryHalf);
-    box(root,0xe8e6db,0,.16,maxZ-.1,40,.32,.16);
+    box(root,0xe8e6db,0,.16,maxZ-.1,width,.32,.16);
     // A glazed automatic entrance opens onto a small exterior landing.
     box(root,0xd9d4c4,maxX+1.2,-.015,entryZ,2.4,.12,3.3).castShadow=false;
     box(root,0xb9c9b3,maxX+1.8,.045,entryZ,1.2,.025,2.45).castShadow=false;
@@ -323,8 +327,9 @@ export class SharedOfficeScene {
     if(this.transition){const t=Math.min(1,(time-this.transition.start)/650),smooth=t*t*(3-2*t);this.viewTarget.lerpVectors(this.transition.from,this.transition.to,smooth);this.zoom=THREE.MathUtils.lerp(this.transition.zoomFrom,this.transition.zoomTo,smooth);this.resize();if(t===1)this.transition=null;}
     for(const actor of this.actors)this.updateActor(actor,dt,time);this.actors=this.actors.filter(actor=>!actor.departed);
     this.executive.update(dt,time,this.motion,this.actors);
+    this.visitor.update(this.navigator,dt,time,this.motion,true,this.executive.spouseTargets());
     if(this.live){const actor=this.showPaths!==false&&(this.actors.find(a=>a.id===this.selectedId&&a.walker.walking)||this.actors.find(a=>a.model.root.visible&&a.walker.walking)),signature=actor?`${actor.id}:${actor.walker.route.length}:${actor.walker.destination.x}:${actor.walker.destination.z}`:'';if(signature!==this.routeSignature){this.routeSignature=signature;if(actor)this.drawRoute(actor);else this.clearRoute();}}
     this.updateLabels();this.renderer.render(this.scene,this.camera);
   }
-  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
+  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();this.visitor.destroy(disposeCharacter);for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
 }

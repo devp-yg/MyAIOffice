@@ -2,7 +2,7 @@ import {EXECUTIVE_WALLS,EXECUTIVE_DOOR_LEAVES,EXECUTIVE_FURNITURE} from './offic
 import {CELL_SIZE,OFFICE_BOUNDS} from './office-navigation.js';
 
 // Space study: shared process zones and repeatable furniture pods, in metres.
-export const SHARED_BOUNDS={minX:-20,maxX:20,minZ:-12,maxZ:12};
+export const SHARED_BOUNDS={minX:-28,maxX:28,minZ:-18,maxZ:18};
 export const ROOM_CORNER_RADIUS=1.35;
 export const ZONE_BOUNDARY_STYLES={
   library:{color:'#b79a72',height:1.02,finish:'shelf'},
@@ -45,13 +45,20 @@ export function createZoneBoundaries(rooms){
   }
   return {walls,gates};
 }
-export const SHARED_ROOMS=[
+const ROOM_OFFSETS={library:[-6.4,-4.8],studio:[0,-4.8],server:[6.4,-4.8],meeting:[-6.4,3.2],desk:[6.4,3.2]};
+const LOCAL_ROOMS=[
   {key:'library',name:'자료 탐색',english:'READ & DISCOVER',color:'#eee2c9',bounds:[-19.2,-6.7,-11.2,-1.8],label:[-13,2.1,-10.1],note:'읽기와 검색을 함께',base:6},
   {key:'studio',name:'개발 스튜디오',english:'MAKE & BUILD',color:'#dfe8d9',bounds:[-6.2,8,-11.2,-1.8],label:[.9,2.1,-10.1],note:'여러 프로젝트가 나란히',base:12},
   {key:'server',name:'실행 · 서버',english:'RUN & OPERATE',color:'#dde6ec',bounds:[8.6,19.2,-11.2,-1.8],label:[14,2.7,-10.1],note:'독립된 실행 포드',base:6},
   {key:'meeting',name:'검토 · 회의',english:'THINK TOGETHER',color:'#e9e0ef',bounds:[-19.2,-5.7,3,11.2],label:[-13,2.1,10.4],note:'동시에 모이는 세 팀',base:12},
   {key:'desk',name:'요청 접수 · 휴식',english:'PAUSE & CONNECT',color:'#e4eadf',bounds:[6.8,19.2,2.8,11.2],label:[13,2.1,10.4],note:'작은 라운지가 이어지는 공간',base:6},
 ];
+// Move complete rooms, including their labels and furnishings, to create gardens
+// between the original pods without changing their internal working clearances.
+export const SHARED_ROOMS=LOCAL_ROOMS.map(room=>{
+  const [dx,dz]=ROOM_OFFSETS[room.key];
+  return {...room,bounds:room.bounds.map((v,i)=>v+(i<2?dx:dz)),label:[room.label[0]+dx,room.label[1],room.label[2]+dz]};
+});
 export const PREVIEW_PROJECTS=[
   {key:'office',name:'오피스',code:'P-01',color:'#b97d5b'},
   {key:'web',name:'웹사이트',code:'P-02',color:'#578b9e'},
@@ -67,7 +74,7 @@ export const SCENARIOS={
 
 export function createSharedLayout(scenario='full'){
   const demand=typeof scenario==='object'?scenario:{},expanded=scenario==='busy',furniture=[],seats=[],pods=[];
-  const bounds={...SHARED_BOUNDS},rooms=SHARED_ROOMS.map(r=>({...r,bounds:[...r.bounds]}));
+  const bounds={...SHARED_BOUNDS},rooms=LOCAL_ROOMS.map(r=>({...r,bounds:[...r.bounds]}));
   const extend=(key,z0,z1)=>{const room=rooms.find(r=>r.key===key);room.bounds[2]=Math.min(room.bounds[2],z0);room.bounds[3]=Math.max(room.bounds[3],z1);bounds.minZ=Math.min(bounds.minZ,Math.floor((z0-.8)/.4)*.4);bounds.maxZ=Math.max(bounds.maxZ,Math.ceil((z1+.8)/.4)*.4);};
   const add=(type,room,x,z,w,d,h=.85,rotation=0)=>{const item={type,room,x,z,w,d,h,rotation};furniture.push(item);return item;};
   const seat=(room,pod,x,z,heading,mode)=>{
@@ -118,7 +125,7 @@ export function createSharedLayout(scenario='full'){
 
   function lounge(id,x,z,extra=false){
     pod(id,'desk',x,z,extra);add('sofa','desk',x,z,2.8,1.15,.95);
-    add('coffee-table','desk',x,z+1.55,1.8,.75,.48);
+    add('coffee-table','desk',x,z+2.35,1.8,.75,.48);
     // Lounge positions sit between the sofa and low table.
     for(const dx of [-.6,.6])seats.push({id:`${id}-${dx<0?0:1}`,room:'desk',pod:id,x:x+dx,z:z+1.3,heading:0,mode:'cup'});
   }
@@ -127,14 +134,22 @@ export function createSharedLayout(scenario='full'){
   for(let row=0;row<Math.ceil(((demand.desk||0)-8)/6);row++){const z=12.5+row*4.8;[9,13,17].forEach((x,i)=>lounge(`pause-wing-${row}-${i}`,x,z,true));extend('desk',2.8,z+3.1);}
   add('cabinet','desk',18.3,4.1,1.1,.6,1.1);
   for(const [x,z,room]of [[-18.3,-2.8,'library'],[-7.1,-10.2,'library'],[7.3,-10.2,'studio'],[18.5,-2.7,'server'],[-18.3,10.3,'meeting'],[-6.9,9.9,'meeting'],[18.5,10.4,'desk'],[7.7,3.5,'desk']])add('plant',room,x,z,.62,.62,1.4);
-  const workSpots=Object.fromEntries(SHARED_ROOMS.map(r=>[r.key,seats.filter(s=>s.room===r.key).map(s=>[s.x,s.z])]));
   const boundaries=createZoneBoundaries(rooms);
+  for(const room of rooms){
+    const [dx,dz]=ROOM_OFFSETS[room.key];
+    room.bounds=room.bounds.map((v,i)=>v+(i<2?dx:dz));
+    room.label=[room.label[0]+dx,room.label[1],room.label[2]+dz];
+    for(const item of [...furniture,...seats,...pods,...boundaries.walls].filter(item=>item.room===room.key)){item.x+=dx;item.z+=dz;}
+    for(const gate of boundaries.gates.filter(gate=>gate.room===room.key))gate.center+=['north','south'].includes(gate.side)?dx:dz;
+    bounds.minZ=Math.min(bounds.minZ,Math.floor((room.bounds[2]-2)/CELL_SIZE)*CELL_SIZE);
+  }
+  const workSpots=Object.fromEntries(SHARED_ROOMS.map(r=>[r.key,seats.filter(s=>s.room===r.key).map(s=>[s.x,s.z])]));
   // Reuse the tower's complete interior at its original scale. Its west entrance
   // faces the shared office after a half turn; the elevator stays in the tower.
   // The courtyard faces the CEO entrance and the lounge. Expansion moves the
   // entire courtyard beyond BOTH shared wings, keeping their circulation clear.
   const edgeInset=.8,meetingEnd=rooms.find(r=>r.key==='meeting').bounds[3],loungeEnd=rooms.find(r=>r.key==='desk').bounds[3];
-  const courtyardStart=Math.max(meetingEnd,loungeEnd)+3;
+  const courtyardStart=Math.max(meetingEnd,loungeEnd)+6.4;
   bounds.maxZ=Math.ceil((courtyardStart+14+edgeInset)/.4)*.4;
   // After the half turn, preserve the tower navigator's grid centers in the
   // shared grid. A half-cell offset otherwise strands the secretary behind
@@ -145,42 +160,84 @@ export function createSharedLayout(scenario='full'){
   };
   const executive={x:alignSuite(bounds.minX+edgeInset+7.8,OFFICE_BOUNDS.minX,bounds.minX),z:alignSuite(courtyardStart+7,OFFICE_BOUNDS.minZ,bounds.minZ),rotation:Math.PI};
   executive.bounds=[executive.x-7.8,executive.x+12,executive.z-7,executive.z+7];
-  const park={bounds:[4.4,18.4,courtyardStart+.2,courtyardStart+13.4],
-    beds:[[5,15,courtyardStart+2.9,courtyardStart+5.7],[5,15,courtyardStart+8.4,courtyardStart+11.1]],
-    label:{x:10,z:courtyardStart+7},
-    trees:[[6.5,courtyardStart+4.1,.9],[13.2,courtyardStart+4.2,1.05],[7,courtyardStart+9.8,1],[13.2,courtyardStart+9.7,.85]],
-    benches:[[9.6,courtyardStart+5.2,Math.PI],[10.4,courtyardStart+8.9,0]]};
-  const paths=[],spineX=2.7,promenadeZ=courtyardStart-1.5;
-  const path=(id,a,b,width=2.2)=>{
+  const park={bounds:[6.4,26.4,courtyardStart+.2,courtyardStart+13.4],
+    beds:[[7.4,22.2,courtyardStart+2.9,courtyardStart+5.7],[7.4,22.2,courtyardStart+8.4,courtyardStart+11.1]],
+    label:{x:16,z:courtyardStart+7},
+    trees:[[9,courtyardStart+4.1,.9],[20,courtyardStart+4.2,1.05],[10,courtyardStart+9.8,1],[20,courtyardStart+9.7,.85]],
+    benches:[]};
+  const landscape={beds:[],trees:[],benches:[]};
+
+  // Keep the public promenade outside the private wing's 2 m buffer, with
+  // enough room for a complete character footprint on the navigation grid.
+  const paths=[],spineX=4,promenadeZ=courtyardStart-1.5;
+  const path=(id,a,b,width=3.2)=>{
     paths.push({id,bounds:[Math.min(a[0],b[0])-width/2,Math.max(a[0],b[0])+width/2,Math.min(a[1],b[1])-width/2,Math.max(a[1],b[1])+width/2]});
   };
-  path('main-concourse',[-17.8,0],[bounds.maxX+1.4,0],2.4);
+  path('main-concourse',[-26,0],[bounds.maxX+1.4,0],4.4);
   path('central-promenade',[spineX,0],[spineX,courtyardStart+12.4]);
-  path('courtyard-forecourt',[-12.3,promenadeZ],[17.2,promenadeZ],2.2);
-  path('meeting-forecourt',[-12.3,meetingEnd],[-12.3,promenadeZ]);
-  path('lounge-forecourt',[13,loungeEnd],[13,promenadeZ]);
+  path('courtyard-forecourt',[-23,promenadeZ],[24.4,promenadeZ],3.2);
+  path('meeting-forecourt',[-18.7,meetingEnd],[-18.7,promenadeZ]);
+  path('lounge-forecourt',[19.4,loungeEnd],[19.4,promenadeZ]);
   for(const gate of boundaries.gates){
     const room=rooms.find(r=>r.key===gate.room),[x0,x1,z0,z1]=room.bounds;
     if(gate.side==='south'&&['library','studio','server'].includes(gate.room))path(`${gate.room}-entry`,[gate.center,z1],[gate.center,0]);
-    if(gate.side==='north'&&['meeting','desk'].includes(gate.room))path(`${gate.room}-entry-${gate.center}`,[gate.center,0],[gate.center,z0],2);
-    if(gate.side==='east'&&gate.room==='meeting')path(`meeting-link-${gate.center}`,[x1,gate.center],[spineX,gate.center],2);
-    if(gate.side==='west'&&gate.room==='desk')path(`lounge-link-${gate.center}`,[spineX,gate.center],[x0,gate.center],2);
-    // Short bridges join adjacent northern doorways without painting a path
-    // through either room. These are only used when one is the destination.
-    if(gate.side==='east'&&['library','studio'].includes(gate.room))path(`${gate.room}-door-${gate.center}`,[x1-.2,gate.center],[x1+.9,gate.center],1.8);
+    if(gate.side==='north'&&['meeting','desk'].includes(gate.room))path(`${gate.room}-entry-${gate.center}`,[gate.center,0],[gate.center,z0],3.2);
+    if(gate.side==='east'&&gate.room==='meeting')path(`meeting-link-${gate.center}`,[x1,gate.center],[spineX,gate.center],3.2);
+    if(gate.side==='west'&&gate.room==='desk')path(`lounge-link-${gate.center}`,[spineX,gate.center],[x0,gate.center],3.2);
+    // Both side doors connect to a continuous planted street between rooms.
+    if(['library','studio','server'].includes(gate.room)&&['west','east'].includes(gate.side)){
+      const lane=gate.room==='library'||gate.room==='studio'&&gate.side==='west'?-9.6:11.6;
+      path(`${gate.room}-${gate.side}-${gate.center}`,[gate.side==='west'?x0:x1,gate.center],[lane,gate.center],3.2);
+    }
   }
-  path('ceo-entry',[executive.bounds[1]-.3,executive.z],[17.2,executive.z]);
-  path('garden-north',[spineX,courtyardStart+1.3],[17.2,courtyardStart+1.3]);
-  path('garden-arrival',[13,promenadeZ],[13,courtyardStart+1.3]);
-  path('garden-east',[17.2,courtyardStart+1.3],[17.2,courtyardStart+12.4]);
-  path('garden-south',[spineX,courtyardStart+12.4],[17.2,courtyardStart+12.4]);
-  const circulation={paths,hub:{x:spineX,z:0},gardenVisit:{x:spineX,z:executive.z}};
+  for(const [id,x,keys]of [['west',-9.6,['library','studio']],['east',11.6,['studio','server']]]){
+    const north=Math.min(...rooms.filter(r=>keys.includes(r.key)).map(r=>r.bounds[2]))+2;
+    path(`${id}-garden-street`,[x,0],[x,north],3.2);
+    for(let z=-5;z>north;z-=7.2){
+      if(boundaries.gates.some(gate=>keys.includes(gate.room)&&['east','west'].includes(gate.side)&&Math.abs(gate.center-z)<3.4))continue;
+      landscape.beds.push([x+2,x+3.1,z-1.6,z+1.6]);
+      landscape.trees.push([x+2.55,z,.72]);
+    }
+  }
+  path('ceo-entry',[executive.bounds[1]-.3,executive.z],[24.4,executive.z]);
+  path('garden-north',[spineX,courtyardStart+1.3],[24.4,courtyardStart+1.3]);
+  path('garden-arrival',[19.4,promenadeZ],[19.4,courtyardStart+1.3]);
+  path('garden-east',[24.4,courtyardStart+1.3],[24.4,courtyardStart+12.4]);
+  path('garden-south',[spineX,courtyardStart+12.4],[24.4,courtyardStart+12.4]);
+  // Rest bays branch off the clear walking lanes. The approach remains a real
+  // walkable destination; the solid seat/backrest are navigation obstacles.
+  const rest=(id,x,z,rotation=0)=>{
+    const bench={id,type:'garden-bench',x,z,w:2.8,d:.8,h:1.12,rotation};
+    const approach={x:x+Math.sin(rotation)*1.25,z:z+Math.cos(rotation)*1.25};
+    landscape.benches.push({...bench,approach});
+    const horizontal=Math.abs(Math.cos(rotation))>.5;
+    paths.push({id:`rest-${id}`,bounds:horizontal?
+      [x-1.9,x+1.9,Math.min(z,approach.z+Math.min(0,Math.cos(rotation))*1.3),Math.max(z,approach.z+Math.max(0,Math.cos(rotation))*1.3)]:
+      [Math.min(x,approach.x+Math.min(0,Math.sin(rotation))*1.3),Math.max(x,approach.x+Math.max(0,Math.sin(rotation))*1.3),z-1.9,z+1.9]});
+  };
+  for(const [i,x]of [-24,-9.6,-2.4,19.4,26].entries()){
+    rest(`concourse-${i}`,x,3.8,Math.PI);
+    path(`rest-link-${i}`,[x,0],[x,2.7],3.6);
+    if(i<4){landscape.beds.push([x+1.9,x+3.4,3,5.1]);landscape.trees.push([x+2.65,4.1,.7]);}
+  }
+  // Repeated rest stops also follow the expanding wings and courtyard route.
+  for(let z=7;z<courtyardStart-2;z+=7.2){
+    rest(`promenade-${z}`,7.3,z,Math.PI*1.5);
+    path(`promenade-rest-${z}`,[spineX,z],[6.1,z],3.6);
+    landscape.beds.push([8.4,10.5,z-1.8,z+1.8]);landscape.trees.push([9.4,z,.85]);
+    landscape.beds.push([-.8,1.5,z-1.6,z+1.6]);
+  }
+  rest('garden-north',14,courtyardStart+3.3,Math.PI);
+  rest('garden-south',15,courtyardStart+10.5);
+  const restStops=landscape.benches.map(bench=>({id:bench.id,...bench.approach,heading:bench.rotation,bench}));
+  const landscapeBlockers=[...landscape.benches,...landscape.beds.map(([x0,x1,z0,z1])=>({type:'garden-bed',x:(x0+x1)/2,z:(z0+z1)/2,w:x1-x0,d:z1-z0,h:.3}))];
+  const circulation={paths,hub:{x:spineX,z:0},gardenVisit:{x:spineX,z:executive.z},restStops};
   const contains=(point,rect,inset=0)=>point.x>=rect[0]+inset&&point.x<=rect[1]-inset&&point.z>=rect[2]+inset&&point.z<=rect[3]-inset;
   const regionAt=point=>rooms.find(room=>contains(point,room.bounds))?.key||(contains(point,executive.bounds)?'executive':null);
   const executiveBlockers=[...EXECUTIVE_WALLS.filter(w=>!w.elevator),...EXECUTIVE_DOOR_LEAVES,...EXECUTIVE_FURNITURE].map(item=>({...item,room:null,x:executive.x-item.x,z:executive.z-item.z,rotation:(item.rotation||0)+Math.PI}));
   const navigationBounds={...bounds,maxX:bounds.maxX+2.4};
-  return {bounds,navigationBounds,rooms,workSpots,furniture,seats,pods,boundaries,executive,park,circulation,regionAt,
-    blockers:[...furniture.filter(item=>item.type!=='chair'),...boundaries.walls,...executiveBlockers],
+  return {bounds,navigationBounds,rooms,workSpots,furniture,seats,pods,boundaries,executive,park,landscape,circulation,regionAt,
+    blockers:[...furniture.filter(item=>item.type!=='chair'),...boundaries.walls,...executiveBlockers,...landscapeBlockers],
     isWalkable:({x,z},margin)=>{
       const point={x,z};
       if(park.beds.some(bed=>contains(point,bed,-margin)))return false;

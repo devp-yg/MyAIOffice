@@ -4,6 +4,18 @@ import { OfficeNavigator, OfficeWalker, WORK_SPOTS, roomAt } from '../public/off
 
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 
+test('a follower can route around nearby people instead of rejecting a short path through them',()=>{
+  const nav=new OfficeNavigator({bounds:{minX:-10,maxX:10,minZ:-8,maxZ:8},rooms:[],blockers:[]});
+  const from=nav.point(nav.nearest({x:-5,z:0})),to=nav.point(nav.nearest({x:5,z:0}));
+  const pair=[{x:0,z:0},{x:1,z:0}],clearance=2.25;
+  const ordinary=nav.findPath(from,to),detour=nav.findPath(from,to,{avoid:pair,clearance});
+  assert.ok(ordinary.some(point=>pair.some(person=>distance(point,person)<clearance)));
+  assert.ok(detour.length>ordinary.length,'follower did not find an alternate passage');
+  assert.deepEqual(detour.at(-1),to);
+  for(const point of detour){assert.ok(nav.isWalkable(point));assert.ok(pair.every(person=>distance(point,person)>=clearance));}
+  assert.deepEqual(nav.findPath(from,to),ordinary,'temporary people changed the office navigation grid');
+});
+
 test('every work station and waiting position is reachable without touching walls or furniture',()=>{
   const nav=new OfficeNavigator();
   let checked=0;
