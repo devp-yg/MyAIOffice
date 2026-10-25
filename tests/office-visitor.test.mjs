@@ -70,7 +70,7 @@ test('spouse enjoys her own road-only stroll without the pair and resumes it whe
   }
 });
 
-test('spouse reaches a distant vantage point through safe passages and stares at the secretary',()=>{
+test('spouse reaches a distant stakeout through safe passages and stays put',()=>{
   for(const nav of layouts().filter(nav=>!nav.executive)){
     const routine=new SpouseWatch(nav);
     const owner=nav.point(nav.nearest(nav.executive?{x:3,z:.6}:{x:10,z:0}));
@@ -114,7 +114,7 @@ test('spouse follows a moving pair at a distance then watches when both stop',()
 
 test('spouse keeps up with the CEO at tower walking speed without stepping backwards on replans',()=>{
   const nav=new OfficeNavigator(createSharedLayout('full')),routine=new SpouseWatch(nav);
-  routine.walker.position=nav.point(nav.nearest({x:-6,z:0}));
+  routine.walker.position=nav.point(nav.nearest({x:-10,z:0}));
   const pair={active:true,owner:{x:0,z:0},secretary:{x:-1.1,z:0},heading:Math.PI/2,walking:true,ownerWalking:true};
   for(let tick=0;tick<125;tick++){
     pair.owner.x+=2.25*.05;pair.secretary.x+=2.25*.05;
@@ -122,25 +122,26 @@ test('spouse keeps up with the CEO at tower walking speed without stepping backw
     assert.ok(nav.segmentIsSafe(before,routine.walker.position));
     assert.ok(routine.walker.position.x>=before.x-.00001,'replanning sent her back toward an old grid center');
   }
-  assert.ok(distance(routine.walker.position,pair.owner)<6,'wife fell behind the couple');
+  assert.ok(distance(routine.walker.position,pair.owner)<SPOUSE_DISTANCE.maximum+1,'wife fell behind the couple');
   pair.walking=false;pair.ownerWalking=false;
   for(let tick=0;tick<600;tick++)routine.tick(.05,pair);
   assert.equal(routine.state,'watching');
-  assert.ok(distance(routine.walker.position,pair.secretary)>=3.2,'wife stood right beside the secretary');
+  assert.ok(distance(routine.walker.position,pair.secretary)>=5.5,'wife stood right beside the secretary');
   assert.ok(distance(routine.walker.position,pair.owner)<=SPOUSE_DISTANCE.maximum);
-  assert.equal(routine.summary,'비서 견제');
+  assert.equal(routine.summary,'잠복 관찰');
 });
 
 test('secretary repositioning does not make the wife wander around a stationary CEO',()=>{
   const nav=new OfficeNavigator(createSharedLayout('full')),routine=new SpouseWatch(nav);
-  routine.walker.position={x:5.5,z:0};
-  const start={...routine.walker.position};
   const pair={active:true,owner:{x:10,z:0},secretary:{x:9,z:0},heading:Math.PI/2,walking:true,ownerWalking:false};
+  for(let tick=0;tick<1000;tick++)routine.tick(.05,pair);
+  assert.equal(routine.state,'watching');
+  const start={...routine.walker.position};
   for(let tick=0;tick<200;tick++){
     pair.secretary.z=Math.sin(tick*.03)*.08;routine.tick(.05,pair);
     assert.equal(routine.state,'watching');assert.deepEqual(routine.facing,pair.secretary);
   }
-  assert.deepEqual(routine.walker.position,start,'wife paced instead of giving the secretary a look');
+  assert.deepEqual(routine.walker.position,start,'wife paced instead of staying in her stakeout');
 });
 
 test('a separated CEO and secretary leave the wife strolling until they come together again',()=>{
@@ -178,8 +179,30 @@ test('after a turn the wife follows the secretary path instead of the CEO headin
   const routine=new SpouseWatch(new OfficeNavigator());
   const pair={active:true,owner:{x:0,z:0},secretary:{x:3,z:5},heading:-Math.PI/2,secretaryHeading:Math.PI,walking:true,ownerWalking:true};
   const goal=routine.goal(pair);
-  assert.ok(goal.z>pair.secretary.z+3,'wife left the secretary route at a corner');
-  assert.ok(Math.abs(goal.x-pair.secretary.x)<.4,'wife wandered into a side room while the secretary walked north');
+  assert.ok(goal.z>=pair.secretary.z+7,'wife left the secretary route at a corner');
+  assert.ok(Math.abs(goal.x-pair.secretary.x)<=1.21,'wife wandered too far to the side while the secretary walked north');
+});
+
+test('a stakeout stays behind the pair near the passage edge and glances only briefly',()=>{
+  const nav=new OfficeNavigator(createSharedLayout('full')),routine=new SpouseWatch(nav);
+  const pair={active:true,owner:{x:10,z:0},secretary:{x:9,z:0},heading:Math.PI/2,ownerFacing:Math.PI/2,secretaryFacing:Math.PI/2,walking:false};
+  for(let tick=0;tick<1000;tick++)routine.tick(.05,pair);
+  const position={...routine.walker.position};
+  assert.equal(routine.state,'watching');
+  assert.ok(position.x<pair.secretary.x-5,'wife stood in front of the couple');
+  assert.ok(Math.abs(position.z)>.5,'wife stood conspicuously in the middle of the passage');
+  assert.ok(distance(position,pair.secretary)>=5.5);
+  assert.ok(distance(position,pair.secretary)<=10);
+  let glimpses=0;
+  for(let tick=0;tick<260;tick++){
+    routine.tick(.05,pair);if(routine.peeking)glimpses++;
+    assertRoadOnly(routine,nav);assert.deepEqual(routine.walker.position,position);
+  }
+  assert.ok(glimpses>=40&&glimpses<=46,'she should glance for about 1.1 s every 6.5 s');
+  routine.walker.position={x:pair.secretary.x-3,z:pair.secretary.z};routine.watchTime=0;
+  assert.equal(routine.peeking,false,'wife stared conspicuously when the couple came too close');
+  routine.tick(.05,{...pair,secretary:{x:5,z:0}});
+  assert.equal(routine.peeking,false,'wife kept peeking after the pair separated');
 });
 
 test('watch routine rebinds safely after a floor change or shared office expansion',()=>{
@@ -262,7 +285,7 @@ test('belly grows smoothly each day while fitting through existing paths at term
   assert.deepEqual(maternityShape(42),maternityShape(40));
 });
 
-test('the real spouse model turns toward the secretary with a sharp expression, then relaxes on return',async()=>{
+test('the real spouse disguises her stance, briefly glances, and relaxes when the pair separate',async()=>{
   const previousDocument=globalThis.document;
   const element=()=>({textContent:'',dataset:{},style:{setProperty(){}},append(){},setAttribute(key,value){this[key]=value;}});
   globalThis.document={createElement:tag=>tag==='canvas'?{getContext:()=>({fillRect(){},fillText(){}})}:element()};
@@ -270,21 +293,32 @@ test('the real spouse model turns toward the secretary with a sharp expression, 
     const {createCharacter,disposeCharacter}=await import('../public/office-scene.js');
     const visitor=new OfficeVisitor(new THREE.Group(),element(),createCharacter),nav=new OfficeNavigator();
     const pair={active:true,owner:{x:3,z:0},secretary:{x:3,z:1},walking:false};
-    for(let tick=0;tick<100;tick++)visitor.update(nav,.05,tick*50,false,true,pair);
+    for(let tick=0;tick<200;tick++)visitor.update(nav,.05,tick*50,false,true,pair);
     assert.equal(visitor.routine.state,'watching');
-    assert.equal(visitor.model.glare.visible,true);assert.equal(visitor.model.smile.visible,false);
-    assert.equal(visitor.model.eyes.scale.y,.5);
-    const position=visitor.routine.walker.position,heading=Math.atan2(pair.secretary.x-position.x,pair.secretary.z-position.z);
-    const gaze=visitor.model.root.rotation.y+visitor.model.head.rotation.y;
-    assert.ok(Math.abs(Math.atan2(Math.sin(gaze-heading),Math.cos(gaze-heading)))<.01);
+    const position={...visitor.routine.walker.position},bodyHeading=visitor.model.root.rotation.y;
+    const direction=Math.atan2(pair.secretary.x-position.x,pair.secretary.z-position.z);
+    const angle=value=>Math.atan2(Math.sin(value),Math.cos(value));
+    assert.ok(Math.abs(angle(bodyHeading-direction))>.9,'body faced the secretary head-on');
+    let glances=0,relaxed=0,accurateGlances=0;
+    for(let tick=200;tick<460;tick++){
+      visitor.update(nav,.05,tick*50,false,true,pair);
+      assert.deepEqual(visitor.routine.walker.position,position);
+      assert.ok(Math.abs(angle(visitor.model.root.rotation.y-bodyHeading))<.01,'body followed every glance');
+      if(visitor.model.glare.visible){
+        glances++;assert.equal(visitor.model.smile.visible,false);assert.equal(visitor.model.eyes.scale.y,.75);
+        if(Math.abs(angle(visitor.model.root.rotation.y+visitor.model.head.rotation.y-direction))<.03)accurateGlances++;
+      }else{relaxed++;assert.equal(visitor.model.smile.visible,true);assert.equal(visitor.model.eyes.scale.y,1);}
+      assert.equal(visitor.model.armL.rotation.z,-.06,'wife used a conspicuous confrontational pose');
+    }
+    assert.ok(glances>=40&&glances<=46);assert.ok(relaxed>200);assert.ok(accurateGlances>20,'brief glances missed the secretary');
     assert.ok(Object.values(visitor.model.props).every(prop=>!prop.visible),'spouse picked up a work prop');
-    visitor.update(nav,.05,5000,false,true,{...pair,secretary:{x:7,z:1}});
+    visitor.update(nav,.05,23000,false,true,{...pair,secretary:{x:7,z:1}});
     assert.ok(['strolling','resting'].includes(visitor.routine.state));
     assert.equal(visitor.model.glare.visible,false);assert.equal(visitor.model.smile.visible,true);
     assert.equal(visitor.model.head.rotation.y,0,'wife kept staring after the pair separated');
-    visitor.update(nav,.05,5050,false,true,pair);
-    assert.equal(visitor.model.glare.visible,true);assert.equal(visitor.model.smile.visible,false);
-    visitor.update(nav,.05,5100,false,true,{...pair,active:false});
+    visitor.update(nav,.05,23050,false,true,pair);
+    assert.deepEqual(visitor.routine.facing,pair.secretary);
+    visitor.update(nav,.05,23100,false,true,{...pair,active:false});
     assert.ok(['strolling','resting'].includes(visitor.routine.state));
     assert.equal(visitor.model.glare.visible,false);assert.equal(visitor.model.smile.visible,true);
     assert.equal(visitor.model.head.rotation.y,0);

@@ -29,7 +29,7 @@ export function maternityShape(weeks,days=0){
 }
 
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-export const SPOUSE_DISTANCE=Object.freeze({minimum:2.2,watching:3.2,preferred:4,maximum:5.8});
+export const SPOUSE_DISTANCE=Object.freeze({minimum:2.2,watching:5.5,preferred:7,maximum:10});
 export const SPOUSE_TRIGGER_DISTANCE=3;
 export const OFFICE_KEEP_OUT=2;
 
@@ -54,6 +54,16 @@ export class SpouseWatch {
     const layout=navigator.customLayout,start=layout?.circulation.gardenVisit||(navigator.executive?{x:-10.2,z:3}:{x:-2,z:0}),nav=this.navigator;
     this.walker=new OfficeWalker(nav,previous&&nav.isWalkable(previous)?previous:nav.point(nav.nearest(previous||start)));
     this.state='waiting';this.facing=null;this.replanIn=0;this.lastPair=null;this.lastSecretary=null;this.anchor=null;
+    this.watchTime=0;this.camouflageHeading=null;
+    // Keep viewpoints near the edge of a passage or beside existing scenery.
+    // Low garden furniture conceals the stance without blocking a brief glance.
+    const cover=nav.blockers.filter(item=>['garden-bed','garden-bench'].includes(item.type));
+    this.coverScores=Array.from(nav.free,(free,index)=>{
+      if(!free)return 0;
+      const point=nav.point(index),edge=nav.neighbors(index).some(next=>!nav.free[next]);
+      const besideCover=cover.some(item=>Math.hypot(Math.max(0,Math.abs(point.x-item.x)-item.w/2),Math.max(0,Math.abs(point.z-item.z)-item.d/2))<1.5);
+      return (edge?1.2:0)+(besideCover?1.2:0);
+    });
     const stops=[layout?.circulation.hub,{x:-16,z:0},{x:16,z:0},...(layout?.circulation.paths||[]).filter(path=>['main-concourse','central-promenade','courtyard-forecourt','garden-north','garden-east','garden-south'].includes(path.id)).map(({bounds:[x0,x1,z0,z1]})=>({x:(x0+x1)/2,z:(z0+z1)/2})),
       layout?.circulation.gardenVisit,layout?{x:17.2,z:layout.park.bounds[2]+1.1}:null,layout?{x:17.2,z:layout.park.bounds[3]-1}:null].filter(Boolean);
     this.roamStops=[...new Set(stops.map(point=>nav.nearest(point)).filter(index=>index>=0))].map(index=>nav.point(index));this.roamIndex=0;this.pause=0;
@@ -61,7 +71,7 @@ export class SpouseWatch {
     this.restTarget=null;this.restingSeat=null;this.walkingTime=0;this.lastRestId=null;this.resumeStop=null;
   }
   stroll(dt){
-    this.facing=null;this.lastPair=null;this.lastSecretary=null;this.anchor=null;this.replanIn=0;
+    this.facing=null;this.lastPair=null;this.lastSecretary=null;this.anchor=null;this.replanIn=0;this.watchTime=0;this.camouflageHeading=null;
     const w=this.walker;
     if(this.state!=='strolling'&&this.state!=='resting'){this.stop();this.pause=0;}
     if(w.walking){
@@ -111,14 +121,12 @@ export class SpouseWatch {
   }
   goal(pair){
     const traveling=pair.ownerWalking??pair.walking,heading=(traveling?pair.secretaryHeading:pair.heading)??pair.heading??0;
-    const dx=pair.secretary.x-pair.owner.x,dz=pair.secretary.z-pair.owner.z,length=Math.hypot(dx,dz);
-    const side=length>.2?{x:dx/length,z:dz/length}:{x:Math.cos(heading),z:-Math.sin(heading)};
-    // Follow their route while travelling. Once the CEO stops, take a clear
-    // position beyond the secretary, without standing beside or between them.
-    return traveling?{
-      x:pair.secretary.x-Math.sin(heading)*3.4+side.x*.3,
-      z:pair.secretary.z-Math.cos(heading)*3.4+side.z*.3,
-    }:{x:pair.secretary.x+side.x*3.5,z:pair.secretary.z+side.z*3.5};
+    // Trail behind and slightly to one side, rather than confronting the pair
+    // in front of the secretary. Navigation still clips this to allowed roads.
+    return {
+      x:pair.secretary.x-Math.sin(heading)*SPOUSE_DISTANCE.preferred+Math.cos(heading)*1.2,
+      z:pair.secretary.z-Math.cos(heading)*SPOUSE_DISTANCE.preferred-Math.sin(heading)*1.2,
+    };
   }
   plan(pair){
     const {owner,secretary}=pair,w=this.walker,nav=this.navigator,candidates=[];
@@ -144,7 +152,12 @@ export class SpouseWatch {
       if(near<SPOUSE_DISTANCE.watching)continue;
       const forward=(point.x-center.x)*Math.sin(heading)+(point.z-center.z)*Math.cos(heading);
       const outsideRange=distance(point,secretary)>SPOUSE_DISTANCE.maximum||distance(point,owner)>ownerLimit;
-      candidates.push({point,visible:this.canSee(point,secretary),score:distance(point,goal)*3+distance(point,w.position)*.15+Math.abs(near-SPOUSE_DISTANCE.preferred)*.6+(traveling?Math.max(0,forward):0)+(outsideRange?20:0)});
+      const inFront=(person,facing)=>{
+        const gap=distance(point,person);
+        return ((point.x-person.x)*Math.sin(facing)+(point.z-person.z)*Math.cos(facing))/gap>.45;
+      };
+      const exposed=inFront(owner,pair.ownerFacing??pair.heading??heading)||inFront(secretary,pair.secretaryFacing??pair.secretaryHeading??heading);
+      candidates.push({point,visible:this.canSee(point,secretary),score:distance(point,goal)*1.2+distance(point,w.position)*.15+Math.abs(near-SPOUSE_DISTANCE.preferred)*.6+Math.max(0,forward)+(exposed?8:0)+(outsideRange?20:0)-this.coverScores[index]});
     }
     candidates.sort((a,b)=>a.score-b.score);
     // When a corner hides the pair, approach a safe nearby passage first,
@@ -165,7 +178,7 @@ export class SpouseWatch {
       if(w.walking&&distance(w.destination,point)<.7)return;
       if(distance(w.position,route[0])<.01)route.shift();
       w.route=route;w.pending=null;w.destination={...point};w.targetRoom=null;w.walking=route.length>0;w.blocked=false;
-      this.anchor={...point};return;
+      this.anchor={...point};this.camouflageHeading=null;return;
     }
   }
   tick(dt,pair=null){
@@ -174,17 +187,17 @@ export class SpouseWatch {
     // release the stare and resume her own road-only stroll.
     if(pair?.insideOffice||!pair?.active||distance(pair.owner,pair.secretary)>SPOUSE_TRIGGER_DISTANCE){this.stroll(dt);return;}
     if(this.state==='strolling'||this.state==='resting'){this.stop();this.pause=0;this.replanIn=0;this.restTarget=null;this.restingSeat=null;this.walkingTime=0;this.resumeStop=null;}
-    this.facing={...pair.secretary};this.replanIn-=dt;
+    this.facing={...pair.secretary};this.replanIn-=dt;this.watchTime+=dt;
     const near=Math.min(distance(w.position,pair.owner),distance(w.position,pair.secretary));
     const far=Math.max(distance(w.position,pair.owner),distance(w.position,pair.secretary));
-    const traveling=pair.ownerWalking??pair.walking,goal=this.goal(pair);
+    const traveling=pair.ownerWalking??pair.walking;
     const ownerLimit=Math.max(SPOUSE_DISTANCE.maximum,distance(pair.owner,pair.secretary)+SPOUSE_DISTANCE.preferred);
     const settled=near>=SPOUSE_DISTANCE.watching&&distance(w.position,pair.owner)<=ownerLimit&&distance(w.position,pair.secretary)<=SPOUSE_DISTANCE.maximum&&this.canSee(w.position,pair.secretary);
-    const atVantage=distance(w.position,goal)<1.1||Boolean(this.anchor&&!w.walking&&distance(w.position,this.anchor)<.15&&this.lastPair&&distance(this.lastPair,pair.owner)<.8&&distance(this.lastSecretary,pair.secretary)<1.3);
-    if(!traveling&&settled&&atVantage){this.stop();this.state='watching';return;}
+    const atVantage=Boolean(this.anchor&&!w.walking&&distance(w.position,this.anchor)<.15&&this.lastPair&&distance(this.lastPair,pair.owner)<.8&&distance(this.lastSecretary,pair.secretary)<1.3);
+    if(!traveling&&settled&&atVantage){this.stop();this.anchor={...w.position};this.state='watching';this.setCamouflageHeading();return;}
     const shifted=!this.lastPair||distance(this.lastPair,pair.owner)>.8||distance(this.lastSecretary,pair.secretary)>.8||this.wasTraveling!==traveling;
     const needsCatchup=traveling&&!w.walking&&far>SPOUSE_DISTANCE.maximum;
-    if((this.replanIn<=0||needsCatchup)&&(shifted||!w.walking||near<SPOUSE_DISTANCE.minimum)){
+    if((this.replanIn<=0||needsCatchup)&&(shifted||!w.walking||near<SPOUSE_DISTANCE.watching)){
       this.plan(pair);this.lastPair={...pair.owner};this.lastSecretary={...pair.secretary};this.wasTraveling=traveling;this.replanIn=.65;
     }
     if(w.walking){
@@ -196,9 +209,14 @@ export class SpouseWatch {
       else w.tick(dt,speed);
     }
     this.state=w.walking?'following':!traveling&&settled?'watching':'observing';
+    if(!w.walking)this.setCamouflageHeading();
   }
-  get text(){if(this.restingSeat)return '산책로 벤치에 앉아 편안하게 쉬는 중';return {waiting:'산책을 준비하는 중',strolling:'혼자 여유롭게 공용 통로를 산책하는 중',resting:'집무실에서 떨어진 공용 공간에서 잠시 쉬는 중',following:'가까워진 남편과 비서에게 눈치를 주러 가는 중',watching:'적당히 떨어져 비서를 빤히 보며 눈치 주는 중',observing:'비서의 움직임을 유심히 지켜보는 중'}[this.state];}
-  get summary(){if(this.restingSeat)return '벤치에서 휴식';return {waiting:'남편 기다림',strolling:'공용층 산책',resting:'산책 중 휴식',following:'남편 따라감',watching:'비서 견제',observing:'비서 주시'}[this.state];}
+  setCamouflageHeading(){
+    if(this.camouflageHeading===null&&this.facing)this.camouflageHeading=Math.atan2(this.facing.x-this.walker.position.x,this.facing.z-this.walker.position.z)+1.05;
+  }
+  get peeking(){return Boolean(this.facing)&&distance(this.walker.position,this.facing)>=SPOUSE_DISTANCE.watching&&this.watchTime%6.5<1.1&&this.canSee(this.walker.position,this.facing);}
+  get text(){if(this.restingSeat)return '산책로 벤치에 앉아 편안하게 쉬는 중';return {waiting:'산책을 준비하는 중',strolling:'혼자 여유롭게 공용 통로를 산책하는 중',resting:'집무실에서 떨어진 공용 공간에서 잠시 쉬는 중',following:'눈에 띄지 않게 멀찍이 뒤따르는 중',watching:'통로 가장자리에 잠복해 가끔 비서를 힐끔 살피는 중',observing:'산책하는 척하며 멀리서 동태를 살피는 중'}[this.state];}
+  get summary(){if(this.restingSeat)return '벤치에서 휴식';return {waiting:'남편 기다림',strolling:'공용층 산책',resting:'산책 중 휴식',following:'조용히 미행',watching:'잠복 관찰',observing:'산책하는 척'}[this.state];}
 }
 
 export class OfficeVisitor {
@@ -224,26 +242,29 @@ export class OfficeVisitor {
     const {walker}=this.routine,{model}=this,walking=walker.walking;
     const seated=this.routine.restingSeat,bench=seated?.bench;
     model.root.position.set(bench?bench.x+Math.sin(seated.heading)*.12:walker.position.x,0,bench?bench.z+Math.cos(seated.heading)*.12:walker.position.z);
-    const face=this.routine.facing,watching=Boolean(face),direction=face?Math.atan2(face.x-walker.position.x,face.z-walker.position.z):model.root.rotation.y;
-    const heading=walking?walker.heading:seated?seated.heading:direction;
+    const face=this.routine.facing,direction=face?Math.atan2(face.x-walker.position.x,face.z-walker.position.z):model.root.rotation.y;
+    const heading=walking?walker.heading:seated?seated.heading:this.routine.camouflageHeading??model.root.rotation.y;
     const turn=Math.atan2(Math.sin(heading-model.root.rotation.y),Math.cos(heading-model.root.rotation.y));
     model.root.rotation.y+=turn*Math.min(1,dt*7);
-    const headTurn=watching?Math.atan2(Math.sin(direction-model.root.rotation.y),Math.cos(direction-model.root.rotation.y)):0;
-    model.head.rotation.y=THREE.MathUtils.clamp(headTurn,-1.3,1.3);model.head.rotation.x=watching?.035:0;
+    const headTurn=Math.atan2(Math.sin(direction-model.root.rotation.y),Math.cos(direction-model.root.rotation.y));
+    const watching=this.routine.peeking&&Math.abs(headTurn)<=1.3;
+    const glance=watching?THREE.MathUtils.clamp(headTurn,-1.3,1.3):0;
+    model.head.rotation.y=face?THREE.MathUtils.lerp(model.head.rotation.y,glance,Math.min(1,dt*9)):0;model.head.rotation.x=watching?.02:0;
     if(model.glare)model.glare.visible=watching;
     if(model.smile)model.smile.visible=!watching;
     const stride=motion&&walking?Math.sin(walker.distanceWalked*10):0;
     model.body.position.y=motion?(walking?Math.abs(stride)*.018:Math.sin(time*.0018)*.006):0;
     if(seated)model.body.position.y+=.22;
     model.legL.rotation.x=seated?-1.1:stride*.28;model.legR.rotation.x=seated?-1.1:-stride*.28;
-    model.armL.rotation.set(watching&&!walking?-.45:-stride*.18,0,watching&&!walking?.6:-.06);
+    model.armL.rotation.set(-stride*.18,0,-.06);
     model.armR.rotation.set(-.65,0,-.35);
-    model.eyes.scale.y=motion&&time%5600>5460?.12:watching?.5:1;
+    model.eyes.scale.y=motion&&time%5600>5460?.12:watching?.75:1;
     if(this.action.textContent!==this.routine.text){
       this.action.textContent=this.routine.text;
       this.updateAccessibleLabel();
     }
     this.label.dataset.state=this.routine.state;
+    this.label.dataset.peeking=String(watching);
     if(pair?.active){this.label.dataset.ownerDistance=distance(walker.position,pair.owner).toFixed(1);this.label.dataset.secretaryDistance=distance(walker.position,pair.secretary).toFixed(1);}
   }
   refreshPregnancy(date=new Date()){
