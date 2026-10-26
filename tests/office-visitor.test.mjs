@@ -128,7 +128,7 @@ test('spouse keeps up with the CEO at tower walking speed without stepping backw
   assert.equal(routine.state,'watching');
   assert.ok(distance(routine.walker.position,pair.secretary)>=5.5,'wife stood right beside the secretary');
   assert.ok(distance(routine.walker.position,pair.owner)<=SPOUSE_DISTANCE.maximum);
-  assert.equal(routine.summary,'잠복 관찰');
+  assert.equal(routine.summary,'주변 구경');
 });
 
 test('secretary repositioning does not make the wife wander around a stationary CEO',()=>{

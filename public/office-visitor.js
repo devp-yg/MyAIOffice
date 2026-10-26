@@ -215,8 +215,8 @@ export class SpouseWatch {
     if(this.camouflageHeading===null&&this.facing)this.camouflageHeading=Math.atan2(this.facing.x-this.walker.position.x,this.facing.z-this.walker.position.z)+1.05;
   }
   get peeking(){return Boolean(this.facing)&&distance(this.walker.position,this.facing)>=SPOUSE_DISTANCE.watching&&this.watchTime%6.5<1.1&&this.canSee(this.walker.position,this.facing);}
-  get text(){if(this.restingSeat)return '산책로 벤치에 앉아 편안하게 쉬는 중';return {waiting:'산책을 준비하는 중',strolling:'혼자 여유롭게 공용 통로를 산책하는 중',resting:'집무실에서 떨어진 공용 공간에서 잠시 쉬는 중',following:'눈에 띄지 않게 멀찍이 뒤따르는 중',watching:'통로 가장자리에 잠복해 가끔 비서를 힐끔 살피는 중',observing:'산책하는 척하며 멀리서 동태를 살피는 중'}[this.state];}
-  get summary(){if(this.restingSeat)return '벤치에서 휴식';return {waiting:'남편 기다림',strolling:'공용층 산책',resting:'산책 중 휴식',following:'조용히 미행',watching:'잠복 관찰',observing:'산책하는 척'}[this.state];}
+  get text(){if(this.restingSeat)return '벤치에 앉아 느긋하게 쉬는 중';return {waiting:'가볍게 산책 나갈 준비 중',strolling:'여유롭게 오피스를 한 바퀴 둘러보는 중',resting:'잠깐 멈춰 쉬어 가는 중',following:'주변을 구경하며 천천히 걷는 중',watching:'잠깐 멈춰 주변을 둘러보는 중',observing:'오피스 풍경을 구경하는 중'}[this.state];}
+  get summary(){if(this.restingSeat)return '벤치에서 휴식';return {waiting:'산책 준비',strolling:'느긋한 산책',resting:'잠깐 쉬는 중',following:'천천히 걷는 중',watching:'주변 구경',observing:'오피스 구경'}[this.state];}
 }
 
 export class OfficeVisitor {
