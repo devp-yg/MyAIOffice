@@ -5,6 +5,7 @@ import {OfficeNavigator,CHARACTER_RADIUS,roomAt} from '../public/office-navigati
 import {createSharedLayout,SCENARIOS} from '../public/shared-office-layout.js';
 import {OfficeVisitor,SpouseWatch,SPOUSE_DISTANCE,SPOUSE_TRIGGER_DISTANCE,VISITOR_PROFILE,pregnancyProgress,maternityShape} from '../public/office-visitor.js';
 
+const fixturePreferences={visitorEnabled:true,visitorName:'테스트 방문객',visitorRole:'방문객',visitorBaby:'테스트 아기',visitorDueDate:'2031-03-15'};
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 function layouts(){
   const standard=new OfficeNavigator(),executive=new OfficeNavigator();executive.setExecutive(true);
@@ -224,26 +225,26 @@ test('a wall blocks the stare while glass and low furniture allow a view',()=>{
   routine.navigator.blockers[0].finish='wood';routine.navigator.blockers[0].h=.85;assert.equal(routine.canSee(from,to),true);
 });
 
-test('visitor uses the upcoming February 28 due date and has no job assignment',()=>{
-  assert.equal(VISITOR_PROFILE.dueDate,'2027-02-28');
-  assert.equal(VISITOR_PROFILE.baby,'아들');
-  assert.equal(VISITOR_PROFILE.role,'CEO 배우자');
+test('public visitor defaults contain no personal information or job assignment',()=>{
+  assert.deepEqual(VISITOR_PROFILE,{name:'',dueDate:'',baby:'',role:''});
+  assert.equal(pregnancyProgress(),null);
+  assert.equal(pregnancyProgress(new Date(),'2031-02-30'),null);
   assert.equal(VISITOR_PROFILE.project,undefined);
 });
 
 test('pregnancy progresses by local calendar days through week and year boundaries',()=>{
   for(const [year,month,day,weeks,days]of [
-    [2026,10,25,22,0],[2026,10,26,22,1],[2026,10,31,22,6],[2026,11,1,23,0],
-    [2026,12,31,31,4],[2027,1,1,31,5],[2027,2,27,39,6],[2027,2,28,40,0],[2027,3,1,40,1],
+    [2030,11,9,22,0],[2030,11,10,22,1],[2030,11,15,22,6],[2030,11,16,23,0],
+    [2030,12,31,29,3],[2031,1,1,29,4],[2031,3,14,39,6],[2031,3,15,40,0],[2031,3,16,40,1],
   ]){
     for(const hour of [0,12,23]){
-      const progress=pregnancyProgress(new Date(year,month-1,day,hour,59));
+      const progress=pregnancyProgress(new Date(year,month-1,day,hour,59),fixturePreferences.visitorDueDate);
       assert.equal(progress.weeks,weeks);assert.equal(progress.days,days);
       assert.equal(progress.label,`임신 ${weeks}주 ${days}일`);
     }
   }
-  assert.equal(pregnancyProgress(new Date(2027,1,28)).daysUntilDue,0);
-  assert.equal(pregnancyProgress(new Date(2027,2,1)).daysUntilDue,-1);
+  assert.equal(pregnancyProgress(new Date(2031,2,15),fixturePreferences.visitorDueDate).daysUntilDue,0);
+  assert.equal(pregnancyProgress(new Date(2031,2,16),fixturePreferences.visitorDueDate).daysUntilDue,-1);
   assert.equal(pregnancyProgress(new Date(2028,1,28),'2028-02-29').label,'임신 39주 6일');
 });
 
@@ -253,19 +254,27 @@ test('an existing visitor refreshes its title and accessible label when the day 
   globalThis.document={createElement:element};
   try{
     const belly={scale:{set(...values){this.values=values;}},position:{set(...values){this.values=values;}}};
-    const visitor=new OfficeVisitor(null,element(),()=>({root:{visible:true},props:{},belly}));
-    visitor.refreshPregnancy(new Date(2026,9,31,23,59));
-    assert.equal(visitor.title.textContent,'봄이 · 임신 22주 6일');
+    const visitor=new OfficeVisitor(null,element(),()=>({root:{visible:true},props:{},belly}),{preferences:fixturePreferences});
+    visitor.refreshPregnancy(new Date(2030,10,15,23,59));
+    assert.equal(visitor.title.textContent,'테스트 방문객 · 임신 22주 6일');
     const before=[...belly.scale.values];
-    visitor.refreshPregnancy(new Date(2026,10,1,0,0));
-    assert.equal(visitor.title.textContent,'봄이 · 임신 23주 0일');
+    visitor.refreshPregnancy(new Date(2030,10,16,0,0));
+    assert.equal(visitor.title.textContent,'테스트 방문객 · 임신 23주 0일');
     assert.match(visitor.label['aria-label'],/임신 23주 0일/);
-    assert.match(visitor.label['aria-label'],/아들/);
-    assert.match(visitor.label.title,/2027-02-28/);
+    assert.match(visitor.label['aria-label'],/테스트 아기/);
+    assert.match(visitor.label.title,/2031-03-15/);
     assert.ok(belly.scale.values.every((value,index)=>value>before[index]),'midnight did not grow the belly');
     const expected=maternityShape(23);
     assert.deepEqual(belly.scale.values,[expected.x,expected.y,expected.z]);
     assert.deepEqual(belly.position.values,[0,expected.centerY,expected.centerZ]);
+    visitor.setProfile({...fixturePreferences,visitorEnabled:false});
+    visitor.update(new OfficeNavigator(),0,0,false,true);
+    assert.equal(visitor.model.root.visible,false);assert.equal(visitor.label.hidden,true);
+    visitor.setProfile({...fixturePreferences,visitorName:'Updated Visitor',visitorDueDate:'',visitorBaby:''});
+    assert.equal(visitor.title.textContent,'Updated Visitor · 임산부');
+    assert.doesNotMatch(visitor.label.title,/출산 예정일|NaN|테스트 아기/);
+    assert.equal(visitor.role.textContent,'방문객');
+
   }finally{if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}
 });
 
@@ -291,7 +300,7 @@ test('the real spouse disguises her stance, briefly glances, and relaxes when th
   globalThis.document={createElement:tag=>tag==='canvas'?{getContext:()=>({fillRect(){},fillText(){}})}:element()};
   try{
     const {createCharacter,disposeCharacter}=await import('../public/office-scene.js');
-    const visitor=new OfficeVisitor(new THREE.Group(),element(),createCharacter),nav=new OfficeNavigator();
+    const visitor=new OfficeVisitor(new THREE.Group(),element(),createCharacter,{preferences:fixturePreferences}),nav=new OfficeNavigator();
     const pair={active:true,owner:{x:3,z:0},secretary:{x:3,z:1},walking:false};
     for(let tick=0;tick<200;tick++)visitor.update(nav,.05,tick*50,false,true,pair);
     assert.equal(visitor.routine.state,'watching');

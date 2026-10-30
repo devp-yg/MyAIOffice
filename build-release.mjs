@@ -19,7 +19,7 @@ for (const name of ['public', 'runtime/node']) {
   await cp(path.join(root, name), path.join(stage, name), { recursive: true });
 }
 
-for (const name of ['README.md', 'Start My AI Office.command', 'Start My AI Office.bat', 'server.mjs', 'server-database.mjs', 'server-records.mjs']) {
+for (const name of ['README.md', 'Start My AI Office.command', 'Start My AI Office.bat', 'server.mjs', 'server-database.mjs', 'server-records.mjs', 'server-settings.mjs']) {
   await cp(path.join(root, name), path.join(stage, name));
 }
 
@@ -50,7 +50,7 @@ async function removeFinderMetadata(directory) {
 await removeFinderMetadata(stage);
 
 // The server creates a fresh data/office.sqlite on first launch. Never copy the
-// developer's database or its WAL files into a release. The release also clears
+// developer's settings.json, database or its WAL files into a release. The release also clears
 // app-specific browser settings once when this version is first opened.
 const zip = spawnSync('zip', ['-X', '-q', '-r', archive, releaseName], { cwd: dist, stdio: 'inherit' });
 if (zip.error) throw zip.error;

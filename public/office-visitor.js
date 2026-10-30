@@ -1,11 +1,13 @@
 import * as THREE from './vendor/three/three.module.js';
+import {DEFAULT_PREFERENCES,validDueDate} from './office-preferences.js';
 import {OfficeNavigator,OfficeWalker} from './office-navigation.js';
 
-export const VISITOR_PROFILE=Object.freeze({name:'봄이',dueDate:'2027-02-28',baby:'아들',role:'CEO 배우자'});
+export const VISITOR_PROFILE=Object.freeze({name:'',dueDate:'',baby:'',role:''});
 
 // Compare calendar days, so DST and the time of day cannot shift the week.
 // A due date is 40 weeks exactly; passing it does not imply an actual birth.
 export function pregnancyProgress(date=new Date(),dueDate=VISITOR_PROFILE.dueDate){
+  if(!dueDate||!validDueDate(dueDate))return null;
   const [year,month,day]=dueDate.split('-').map(Number);
   const today=Date.UTC(date.getFullYear(),date.getMonth(),date.getDate());
   const daysUntilDue=Math.round((Date.UTC(year,month-1,day)-today)/86400000);
@@ -220,20 +222,28 @@ export class SpouseWatch {
 }
 
 export class OfficeVisitor {
-  constructor(world,labelLayer,createCharacter,{shared=false}={}){
+  constructor(world,labelLayer,createCharacter,{shared=false,preferences=DEFAULT_PREFERENCES}={}){
     this.model=createCharacter(world,'meeting',{index:7,pregnant:true,accessory:'none'});
     this.label=document.createElement('div');
     this.label.className=shared?'study-agent-label visitor-label':'world-agent-label visitor-label show-task';
     this.label.style.setProperty('--project','#b77f96');this.label.style.pointerEvents='none';
     this.title=document.createElement('strong');
-    const role=document.createElement('small');role.className='study-agent-project';role.textContent=`${VISITOR_PROFILE.role} · ${VISITOR_PROFILE.baby}`;
+    const role=document.createElement('small');role.className='study-agent-project';this.role=role;
     this.action=document.createElement('span');this.action.className='study-agent-action';
     this.label.append(this.title,role,this.action);labelLayer.append(this.label);
-    this.refreshPregnancy();this.nextPregnancyCheck=0;
+    this.setProfile(preferences);this.nextPregnancyCheck=0;
     for(const prop of Object.values(this.model.props))prop.visible=false;
     this.model.root.visible=false;this.label.hidden=true;
   }
+  setProfile(preferences={}){
+    this.enabled=preferences.visitorEnabled===true;
+    this.profile={name:preferences.visitorName||'방문객',role:preferences.visitorRole||'임산부',baby:preferences.visitorBaby||'',dueDate:preferences.visitorDueDate||''};
+    this.role.textContent=[this.profile.role,this.profile.baby].filter(Boolean).join(' · ');
+    this.progress=undefined;this.refreshPregnancy();
+    if(!this.enabled){this.model.root.visible=false;this.label.hidden=true;}
+  }
   update(navigator,dt,time,motion=true,visible=true,pair=null){
+    visible=visible&&this.enabled;
     if(time>=this.nextPregnancyCheck){this.refreshPregnancy();this.nextPregnancyCheck=time+1000;}
     this.model.root.visible=visible;if(!visible){this.label.hidden=true;return;}
     if(!this.routine)this.routine=new SpouseWatch(navigator);
@@ -268,14 +278,15 @@ export class OfficeVisitor {
     if(pair?.active){this.label.dataset.ownerDistance=distance(walker.position,pair.owner).toFixed(1);this.label.dataset.secretaryDistance=distance(walker.position,pair.secretary).toFixed(1);}
   }
   refreshPregnancy(date=new Date()){
-    const progress=pregnancyProgress(date);if(this.progress?.label===progress.label)return;
-    this.progress=progress;this.title.textContent=`${VISITOR_PROFILE.name} · ${progress.label}`;
-    const shape=maternityShape(progress.weeks,progress.days);
+    const progress=pregnancyProgress(date,this.profile.dueDate),label=progress?.label||'임산부';
+    if(this.progress?.label===label)return;
+    this.progress=progress||{label};this.title.textContent=`${this.profile.name} · ${label}`;
+    const shape=maternityShape(progress?.weeks??20,progress?.days??0);
     if(this.model.belly){this.model.belly.scale.set(shape.x,shape.y,shape.z);this.model.belly.position.set(0,shape.centerY,shape.centerZ);}
-    this.label.title=`${this.title.textContent} · ${VISITOR_PROFILE.baby} · 출산 예정일 ${VISITOR_PROFILE.dueDate}`;
+    this.label.title=[this.title.textContent,this.profile.baby,this.profile.dueDate?`출산 예정일 ${this.profile.dueDate}`:''].filter(Boolean).join(' · ');
     this.updateAccessibleLabel();
   }
-  updateAccessibleLabel(){this.label.setAttribute('aria-label',`${VISITOR_PROFILE.name} · ${this.progress.label} · ${VISITOR_PROFILE.baby} · ${VISITOR_PROFILE.role} · ${this.action.textContent} · 출산 예정일 ${VISITOR_PROFILE.dueDate}`);}
+  updateAccessibleLabel(){this.label.setAttribute('aria-label',[this.profile.name,this.progress.label,this.profile.baby,this.profile.role,this.action.textContent,this.profile.dueDate?`출산 예정일 ${this.profile.dueDate}`:''].filter(Boolean).join(' · '));}
   get labelPoint(){return new THREE.Vector3(this.model.root.position.x,2.2,this.model.root.position.z);}
   destroy(disposeCharacter){this.model.root.removeFromParent();disposeCharacter(this.model);this.label._leader?.remove();this.label.remove();}
 }

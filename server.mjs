@@ -5,10 +5,12 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { summarizeLine, projectInfo, sessionSummary, digest } from './server-records.mjs';
 import { openOfficeDatabase, validateRegistries } from './server-database.mjs';
+import { createSettingsStore } from './server-settings.mjs';
 import { StaffIdentities } from './public/staff-identities.js';
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||4173),host='127.0.0.1';
 const officeDatabase=await openOfficeDatabase();
+const settingsStore=createSettingsStore(path.join(root,'data','settings.json'));
 const staticRoot=path.join(root,'public'),codexHome=process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),sessionsRoot=path.join(path.resolve(codexHome),'sessions');
 const mimeTypes={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.json':'application/json; charset=utf-8'};
 const sessionCache=new Map(),metadataCache=new Map(),directoryCache=new Map(),clients=new Set();
@@ -89,6 +91,18 @@ function sendJson(response,value){response.writeHead(200,{'content-type':mimeTyp
 async function readJsonBody(request,limit=1024*1024){let size=0;const chunks=[];for await(const chunk of request){size+=chunk.length;if(size>limit)throw Object.assign(new Error('Request body is too large'),{status:413});chunks.push(chunk);}try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw Object.assign(new Error('Invalid JSON'),{status:400});}}
 const server=createServer(async(request,response)=>{
   const url=new URL(request.url||'/',`http://${host}:${port}`);
+  if(url.pathname==='/api/settings'){
+    const allowedHosts=new Set([`${host}:${port}`,`localhost:${port}`,`[::1]:${port}`]);
+    if(!allowedHosts.has(request.headers.host)||request.headers.origin&&request.headers.origin!==`http://${request.headers.host}`){response.writeHead(403).end('Forbidden');return;}
+    try{
+      if(request.method==='GET')return sendJson(response,await settingsStore.read());
+      if(request.method==='PATCH'){
+        if(!request.headers['content-type']?.startsWith('application/json')){response.writeHead(415).end('Expected application/json');return;}
+        return sendJson(response,await settingsStore.update(await readJsonBody(request,16384)));
+      }
+      response.writeHead(405,{allow:'GET, PATCH'}).end('Method not allowed');return;
+    }catch(error){response.writeHead(error.status||500,{'content-type':'text/plain; charset=utf-8'}).end(error.status?error.message:'Unable to read or save settings');return;}
+  }
   if(url.pathname==='/api/state')return sendJson(response,snapshotCache);
   if(url.pathname==='/api/registry'&&request.method==='GET')return sendJson(response,officeDatabase.readRegistries());
   if(url.pathname==='/api/registry'&&request.method==='PUT'){

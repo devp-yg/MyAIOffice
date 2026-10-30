@@ -58,7 +58,7 @@ test('visitor renders a seated pose on the timber bench while retaining a safe r
   globalThis.document={createElement:tag=>tag==='canvas'?{getContext:()=>({fillRect(){},fillText(){}})}:element()};
   try{
     const {createCharacter,disposeCharacter}=await import('../public/office-scene.js');
-    const visitor=new OfficeVisitor(new THREE.Group(),element(),createCharacter,{shared:true});
+    const visitor=new OfficeVisitor(new THREE.Group(),element(),createCharacter,{shared:true,preferences:{visitorEnabled:true}});
     const nav=new OfficeNavigator(createSharedLayout('full'));
     for(let tick=0;tick<2000&&!visitor.routine?.restingSeat;tick++)visitor.update(nav,.1,tick*100,false,true,{context:'shared',insideOffice:true,active:false});
     const stop=visitor.routine.restingSeat;

@@ -56,6 +56,8 @@ The tower office organizes projects by floor. Select a floor or project from the
 ## Data and privacy
 
 - The app runs on `127.0.0.1` so it can only be accessed from your computer.
+- Open **⚙ Settings (설정)** in the shared office header or **Settings** in the tower sidebar. Set the CEO and secretary profiles and the visitor’s visibility, name, relationship, baby information and due date, then choose **Save settings (설정 저장)**.
+- Settings are saved in the project’s `data/settings.json`, shared by both views and preserved across restarts. Old browser preferences are migrated to this file and removed from browser storage after a successful save. Public defaults contain no personal profiles or due date.
 - On first launch, the app automatically creates a `data/office.sqlite` database in the project folder.
 - Codex session information is read from `~/.codex/sessions` on macOS and `%USERPROFILE%\.codex\sessions` on Windows. Original session files are not copied into the app database.
 - The app does not display conversation contents. Check the screen before sharing or capturing it, since it may show real work details.
@@ -64,7 +66,7 @@ The tower office organizes projects by floor. Select a floor or project from the
 
 ## Build a release ZIP
 
-Run `node build-release.mjs` in a development environment to create a ZIP in `dist/`. Building a release ZIP requires platform-specific Node.js executables in `runtime/node/`. The ZIP does not include the developer's database or browser settings; it creates a new database on the computer where it is run.
+Run `node build-release.mjs` in a development environment to create a ZIP in `dist/`. Building a release ZIP requires platform-specific Node.js executables in `runtime/node/`. The ZIP does not include the developer's `data/` folder (profiles, pregnancy settings, location and database) or browser settings; it creates a new database on the computer where it is run.
 
 ## Project structure
 

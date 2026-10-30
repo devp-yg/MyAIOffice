@@ -1,4 +1,5 @@
-# Local data and generated releases
+# Local user profiles, pregnancy settings, location, databases and generated releases
+# Keep all user input in data/, outside public/ and release source files.
 /data/
 /dist/
 

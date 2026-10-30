@@ -1,3 +1,5 @@
+import {DEFAULT_PREFERENCES} from './office-preferences.js';
+import {loadPreferences,savePreferences,mountOfficeSettings} from './office-settings.js';
 import {SharedOfficeScene} from './shared-office-scene.js';
 import {SHARED_ROOMS,PREVIEW_PROJECTS,SCENARIOS} from './shared-office-layout.js';
 import {SharedOfficeOccupancy,sharedProjects} from './shared-office-state.js';
@@ -46,7 +48,7 @@ function renderCounts(){
 }
 function refreshDetail(){
   if(!demo&&!latest){detail('실제 작업을 불러오는 중입니다','Codex의 프로젝트와 직원 정보를 연결하고 있어요.');return;}
-  if(scene.selectedOwner){$('#session-detail').hidden=true;detail(`${scene.executive.ownerName} · CEO`,'팀을 살펴보고 업무 진행 상황을 조율하고 있습니다.');return;}
+  if(scene.selectedOwner){$('#session-detail').hidden=true;detail(`${scene.executive.ownerName} · ${scene.executive.ownerTitle}`,'팀을 살펴보고 업무 진행 상황을 조율하고 있습니다.');return;}
   if(selectedSession){
     const actor=scene.actors.find(a=>a.id===selectedSession),session=demo?actor?.session:latest?.sessions.find(s=>s.id===selectedSession);
     if(actor||session){
@@ -113,14 +115,22 @@ function toggleDemo(){
   $('#walk-preview').setAttribute('aria-pressed',String(!demo&&scene.showPaths!==false));$('#walk-preview').lastChild.textContent=demo?' 직원 동선 보기':' 이동 경로';updateConnection(connection);renderProjects();renderCounts();
 }
 
+let preferences={...DEFAULT_PREFERENCES,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches},settingsLoadError='';
+try{Object.assign(preferences,await loadPreferences());}catch(error){Object.assign(preferences,error.preferences||{});settingsLoadError=error.message;}
+function applyPreferences(next){
+  preferences={...next};document.body.classList.toggle('large-text',preferences.largeText);
+  scene?.setPreferences(preferences);$('#motion-toggle').setAttribute('aria-pressed',String(preferences.motion));
+  if(scene)refreshDetail();
+}
+const officeSettings=mountOfficeSettings({getPreferences:()=>preferences,onApply:applyPreferences,loadError:settingsLoadError});
+$('#open-settings').addEventListener('click',()=>officeSettings.open());
 try{
-  const preferences=stored('my-ai-office-preferences');
   scene=new SharedOfficeScene($('#study-canvas'),{
     onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,preferences,
     onView:({zoom,elevation})=>{$('#zoom-label').textContent=`${Math.round(zoom*100)}%`;$$('[data-angle]').forEach(b=>{const selected=Math.abs(Number(b.dataset.angle)-elevation)<4;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});},
     onWalkEnd:()=>{if(demo){$('#walk-preview').setAttribute('aria-pressed','false');$('#walk-preview').lastChild.textContent=' 직원 동선 보기';}},
   });
-  if(typeof preferences.motion==='boolean')scene.motion=preferences.motion;
+  applyPreferences(preferences);
   $('#motion-toggle').setAttribute('aria-pressed',String(scene.motion));$('#show-resting').checked=showResting;
   applyLive();
   feed=new OfficeLiveFeed({cachedRegistry:{staff:stored('office-staff-registry'),floors:stored('office-floor-registry')},onConnection:updateConnection,onSnapshot:(snapshot,nextRegistry)=>{
@@ -138,14 +148,13 @@ try{
   $('#close-session').addEventListener('click',()=>{selectedSession=null;scene.selectActor(null);refreshDetail();renderRoster();renderCounts();});
   $('#zoom-in').addEventListener('click',()=>scene.setZoom(scene.zoom*1.2));$('#zoom-out').addEventListener('click',()=>scene.setZoom(scene.zoom/1.2));
   $('#labels-toggle').addEventListener('click',()=>{scene.showLabels=!scene.showLabels;$('#labels-toggle').setAttribute('aria-pressed',String(scene.showLabels));scene.updateLabels();});
-  $('#motion-toggle').addEventListener('click',()=>{scene.motion=!scene.motion;$('#motion-toggle').setAttribute('aria-pressed',String(scene.motion));});
+  $('#motion-toggle').addEventListener('click',async()=>{try{applyPreferences(await savePreferences({motion:!scene.motion}));}catch(error){announce(error.message);officeSettings.showError(error);}});
   $('#stage-expand').addEventListener('click',toggleStageExpansion);
   document.addEventListener('fullscreenchange',syncStageExpansion);document.addEventListener('webkitfullscreenchange',syncStageExpansion);
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('.study-stage').classList.contains('stage-expanded')){$('.study-stage').classList.remove('stage-expanded');syncStageExpansion();}});
   $('#walk-preview').addEventListener('click',()=>{if(!demo){scene.showPaths=scene.showPaths===false;scene.routeSignature='force';$('#walk-preview').setAttribute('aria-pressed',String(scene.showPaths));}else if(!scene.walkActor&&scene.startWalk()){$('#walk-preview').setAttribute('aria-pressed','true');$('#walk-preview').lastChild.textContent=' 정원을 돌아오는 중';}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)feed.refresh();});
-  addEventListener('storage',event=>{if(event.key==='my-ai-office-preferences'){const next=stored('my-ai-office-preferences');scene.setLocation(next.latitude,next.longitude);}});
   addEventListener('pagehide',event=>{if(!event.persisted){feed.stop();scene.destroy();}});
 }catch(error){
-  console.error('Shared office could not start',error);feed?.stop();scene?.destroy();$('#study-canvas').innerHTML='<div class="scene-error"><strong>3D 오피스를 열 수 없어요.</strong><p>3D 공간을 준비하지 못했어요. 페이지를 새로고침해 주세요.</p></div>';$$('button').forEach(b=>b.disabled=true);
+  console.error('Shared office could not start',error);feed?.stop();scene?.destroy();$('#study-canvas').innerHTML='<div class="scene-error"><strong>3D 오피스를 열 수 없어요.</strong><p>3D 공간을 준비하지 못했어요. 페이지를 새로고침해 주세요.</p></div>';$$('button').filter(b=>b.id!=='open-settings'&&!b.closest('#settings-dialog')).forEach(b=>b.disabled=true);
 }

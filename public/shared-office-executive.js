@@ -39,9 +39,20 @@ export class SharedExecutiveWing {
     title.textContent=String(preferences.executiveSuiteName||'').trim()||'CEO 집무실';subtitle.textContent='비서실 · 접견실 · 서재';this.label.append(title,subtitle);
     this.label.setAttribute('aria-label','CEO 집무실 확대');this.label.addEventListener('click',onSelect);labelLayer.append(this.label);
     this.roomLabels=EXECUTIVE_ROOM_LAYOUT.map(room=>{const node=document.createElement('div');node.className='study-room-label study-executive-room-label';const name=document.createElement('strong');name.textContent=EXECUTIVE_ROOM_NAMES[room.key]||room.key;node.append(name);node.setAttribute('aria-label',name.textContent);labelLayer.append(node);return{node,point:room.label};});
-    this.ownerName=String(preferences.ownerName||'').trim()||'회장님';this.secretaryName=String(preferences.secretaryName||'').trim()||'지니';
-    this.ownerLabel=this.personLabel(this.ownerName,'CEO',this.patrol.text,'owner',onOwnerSelect);
+    this.ownerName=String(preferences.ownerName||'').trim()||'회장님';this.secretaryName=String(preferences.secretaryName||'').trim()||'비서';
+    this.ownerTitle=preferences.ownerTitle||'CEO';
+    this.ownerLabel=this.personLabel(this.ownerName,this.ownerTitle,this.patrol.text,'owner',onOwnerSelect);
     this.secretaryLabel=this.personLabel(this.secretaryName,'비서',this.routine.text,'secretary');
+    this.setPreferences(preferences);
+  }
+  setPreferences(preferences){
+    this.ownerName=preferences.ownerName||'회장님';this.ownerTitle=preferences.ownerTitle||'CEO';this.ownerRank=String(preferences.ownerRank||'').replace(/^#/,'');this.secretaryName=preferences.secretaryName||'비서';
+    this.label.querySelector('strong').textContent=preferences.executiveSuiteName||'CEO 집무실';
+    this.ownerLabel.querySelector('strong>span').textContent=this.ownerName;
+    this.ownerLabel.querySelector('.study-agent-rank').textContent=`${this.ownerTitle}${this.ownerRank?` · #${this.ownerRank}`:''}`;
+    this.secretaryLabel.querySelector('strong>span').textContent=this.secretaryName;
+    this.ownerLabel.setAttribute('aria-label',`${this.ownerName} · ${this.ownerTitle} · ${this.patrol.text}`);
+    this.secretaryLabel.setAttribute('aria-label',`${this.secretaryName} · 비서 · ${this.routine.text}`);
   }
   personLabel(name,role,activity,kind,onSelect){
     const label=document.createElement(kind==='owner'?'button':'div');label.className=`study-agent-label study-executive-person ${kind}`;
@@ -90,7 +101,7 @@ export class SharedExecutiveWing {
       if(this.assisting){const start=this.root.worldToLocal(this.companion.root.getWorldPosition(new THREE.Vector3()));this.assisting=false;routine.resetHome({x:start.x,z:start.z});this.companion.root.visible=false;this.secretary.root.visible=true;}
       routine.tick(dt,{ceoPresent:true,ceoReady,ceoPhase:'idle',ceoRoom:'desk'});
     }
-    if(this.assisting){const ownerAction=this.ownerLabel.querySelector('.study-agent-action');if(ownerAction.textContent!==this.patrol.text)ownerAction.textContent=this.patrol.text;this.ownerLabel.setAttribute('aria-label',`${this.ownerName} · CEO · ${this.patrol.text}`);return;}
+    if(this.assisting){const ownerAction=this.ownerLabel.querySelector('.study-agent-action');if(ownerAction.textContent!==this.patrol.text)ownerAction.textContent=this.patrol.text;this.ownerLabel.setAttribute('aria-label',`${this.ownerName} · ${this.ownerTitle} · ${this.patrol.text}`);return;}
     const walking=routine.walker.walking&&!routine.greeting,carrying=routine.prop.endsWith('Tray'),cycle=routine.walker.distanceWalked*11;
     model.root.position.set(routine.walker.position.x,0,routine.walker.position.z);
     const face=routine.greeting?ownerLocal:routine.facing,heading=walking?routine.walker.heading:Math.atan2(face.x-model.root.position.x,face.z-model.root.position.z);
@@ -105,7 +116,7 @@ export class SharedExecutiveWing {
     const action=this.secretaryLabel.querySelector('.study-agent-action');if(action.textContent!==routine.text)action.textContent=routine.text;
     this.secretaryLabel.setAttribute('aria-label',`${this.secretaryName} · 비서 · ${routine.text}`);
     const ownerAction=this.ownerLabel.querySelector('.study-agent-action');if(ownerAction.textContent!==this.patrol.text)ownerAction.textContent=this.patrol.text;
-    this.ownerLabel.setAttribute('aria-label',`${this.ownerName} · CEO · ${this.patrol.text}`);
+    this.ownerLabel.setAttribute('aria-label',`${this.ownerName} · ${this.ownerTitle} · ${this.patrol.text}`);
   }
   updateOwner(dt,time,motion,actors){
     const walker=this.ownerWalker,patrol=this.patrol,model=this.owner;if(!walker)return;

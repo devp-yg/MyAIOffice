@@ -85,7 +85,7 @@ export class SharedOfficeScene {
     this.actorLabels=new SharedOfficeLabels(this.labelLayer);
     this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),selected:()=>this.selectedOwner,summary:()=> '… 대기'});
     this.actorLabels.add(this.executive.secretaryLabel,{model:()=>this.executive.assisting?this.executive.companion:this.executive.secretary,working:()=>true});
-    this.visitor=new OfficeVisitor(this.world,this.labelLayer,createCharacter,{shared:true});
+    this.visitor=new OfficeVisitor(this.world,this.labelLayer,createCharacter,{shared:true,preferences});
     this.actorLabels.add(this.visitor.label,{model:()=>this.visitor.model,working:()=>false,summary:()=>this.visitor.routine?.summary||'산책 준비'});
     // Use the existing office camera gestures and keyboard controls.
     canvas.addEventListener('pointerdown',()=>{this.transition=null;});
@@ -105,6 +105,10 @@ export class SharedOfficeScene {
     this.visitor.update(this.navigator,0,performance.now(),this.motion,true,this.executive.spouseTargets());
     for(const actor of this.actors){actor.walker.navigator=this.navigator;actor.walker.route=[];actor.walker.pending=null;actor.walker.destination={x:Infinity,z:Infinity};}
     this.renderer.shadowMap.needsUpdate=true;this.resize();
+  }
+  setPreferences(preferences){
+    this.motion=preferences.motion;this.executive.setPreferences(preferences);this.visitor.setProfile(preferences);
+    this.setLocation(preferences.latitude,preferences.longitude);this.updateLabels();
   }
   setLocation(latitude,longitude){
     if(!Number.isFinite(latitude)||!Number.isFinite(longitude)){this.location=null;this.solarEvents=null;this.lightingMinute=-1;return;}

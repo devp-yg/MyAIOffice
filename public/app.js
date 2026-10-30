@@ -1,3 +1,5 @@
+import {DEFAULT_PREFERENCES} from './office-preferences.js';
+import {loadPreferences,savePreferences,mountOfficeSettings} from './office-settings.js';
 import { characterSvg } from './office-art.js';
 import { OfficeScene } from './office-scene.js';
 import { BuildingDirectory } from './office-building.js';
@@ -27,11 +29,11 @@ const executiveRooms={
   desk:{name:'CEO 집무실',purpose:'집무 · 소규모 면담 · 독립 응접',empty:'CEO 전용 집무 공간'},
   research:{name:'프라이빗 라운지',purpose:'티룸 · 비공식 대화 · 휴식',empty:'CEO 전용 라운지'},
 };
-let saved={};
-try { saved=JSON.parse(localStorage.getItem('my-ai-office-preferences')||'{}'); } catch { /* Storage can be disabled in a private browser. */ }
+let saved={},settingsLoadError='';
+try{saved=await loadPreferences();}catch(error){saved=error.preferences||{};settingsLoadError=error.message;}
 const needsOfficeSetup=!String(saved.executiveSuiteName||'').trim()||!String(saved.ownerName||'').trim();
 const motionQuery=matchMedia('(prefers-reduced-motion: reduce)');
-const prefs={motion:saved.motion ?? !motionQuery.matches,largeText:saved.largeText ?? true,evening:saved.evening ?? false,latitude:saved.latitude??null,longitude:saved.longitude??null,executiveSuiteName:saved.executiveSuiteName??'EXECUTIVE SUITE',ownerName:saved.ownerName??'',ownerTitle:saved.ownerTitle??'CEO',ownerRank:saved.ownerRank??'1',secretaryName:saved.secretaryName??'지니'};
+const prefs={...DEFAULT_PREFERENCES,motion:!motionQuery.matches,...saved};
 const state={sessions:[],archives:[],projects:[],projectKey:null,archiveView:false,selectedArchive:null,selectedRoom:null,selectedSession:null,teamFilter:'all',activityFilter:'all',demo:false,focused:false,connected:false,checkedAt:null,dataReady:false};
 function stored(key){try{return JSON.parse(localStorage.getItem(key)||'{}');}catch{return {};}}
 let directory=new BuildingDirectory(stored('office-floor-registry')),identities=new StaffIdentities(stored('office-staff-registry'));
@@ -71,6 +73,7 @@ async function loadRegistries(){
 }
 let officeScene=null,ownerStatus=null,buildingSignature='',viewerTrip=null,viewerFrame=0;
 state.followOwner=true;state.activeFloorsOnly=false;state.calls=new Map();
+const officeSettings=mountOfficeSettings({getPreferences:()=>prefs,onApply:next=>{Object.assign(prefs,next);applyPrefs();render();renderBuilding();},onLocation:()=>requestLocation(true),loadError:settingsLoadError});
 $('#owner-portrait').innerHTML=ownerPortrait(prefs.ownerRank);
 let realSnapshot={sessions:[]},lastSignature='',demoTimer=null,demoStart=0,resizeFrame;
 let startupPoll=null,refreshPending=false;
@@ -97,16 +100,9 @@ function applyPrefs(){
   document.body.classList.toggle('still',!prefs.motion);
   document.body.classList.toggle('large-text',prefs.largeText);
   document.body.classList.toggle('evening',prefs.evening);
-  $('#motion-setting').checked=prefs.motion;
-  $('#text-setting').checked=prefs.largeText;
-  $('#theme-setting').checked=prefs.evening;
-  $('#owner-name-setting').value=prefs.ownerName;
-  $('#executive-suite-name-setting').value=prefs.executiveSuiteName;
-  $('#owner-title-setting').value=prefs.ownerTitle;
-  $('#owner-rank-setting').value=prefs.ownerRank;
-  $('#secretary-name-setting').value=prefs.secretaryName;
   officeScene?.setLocation(prefs.latitude,prefs.longitude);renderLocation();
   applyOwnerIdentity();
+  officeScene?.visitor.setProfile(prefs);
   officeScene?.setSecretaryIdentity(prefs.secretaryName);officeScene?.setMotion(prefs.motion);officeScene?.setEvening(prefs.evening);
 }
 function renderLocation(message=''){
@@ -114,15 +110,14 @@ function renderLocation(message=''){
   const coordinates=hasLocation?`${Math.abs(prefs.latitude).toFixed(2)}°${prefs.latitude<0?'S':'N'}, ${Math.abs(prefs.longitude).toFixed(2)}°${prefs.longitude<0?'W':'E'}`:'';
   const label=message||(hasLocation?`위치 · ${coordinates}`:'위치 확인 중');
   const indicator=$('#location-indicator');if(indicator){indicator.textContent=label;indicator.title=hasLocation?`현재 위치 ${coordinates} · ${timezone}`:label;}
-  const detail=$('#location-detail');if(detail)detail.textContent=hasLocation?`${message?`${message} · `:''}현재 위치 ${coordinates} · ${timezone} 기준으로 계산합니다. 좌표는 이 브라우저에 저장하며, 500m 이상 이동하면 자동 갱신합니다.`:(message||'위치 권한을 허용하면 이 기기에서 좌표를 받아 저장합니다. 위치가 없으면 기본 시간대를 사용합니다.');
+  const detail=$('#location-detail');if(detail)detail.textContent=hasLocation?`${message?`${message} · `:''}현재 위치 ${coordinates} · ${timezone} 기준으로 계산합니다. 좌표는 프로젝트의 설정 파일에 저장하며, 500m 이상 이동하면 자동 갱신합니다.`:(message||'위치 권한을 허용하면 이 기기에서 좌표를 받아 저장합니다. 위치가 없으면 기본 시간대를 사용합니다.');
 }
 let locationWatchId=null;
 function distanceBetweenKm(aLat,aLon,bLat,bLon){const radians=value=>value*Math.PI/180,dLat=radians(bLat-aLat),dLon=radians(bLon-aLon),a=Math.sin(dLat/2)**2+Math.cos(radians(aLat))*Math.cos(radians(bLat))*Math.sin(dLon/2)**2;return 6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 function acceptLocation(position,notify=false){
   const {latitude,longitude}=position.coords;
   if(Number.isFinite(prefs.latitude)&&Number.isFinite(prefs.longitude)&&distanceBetweenKm(prefs.latitude,prefs.longitude,latitude,longitude)<.5){renderLocation();return;}
-  prefs.latitude=latitude;prefs.longitude=longitude;savePrefs();
-  if(notify)announce('현재 위치를 저장했어요. 일출·일몰 시각을 다시 계산합니다.');
+  savePrefs({latitude,longitude}).then(saved=>{if(saved&&notify)announce('현재 위치를 저장했어요. 일출·일몰 시각을 다시 계산합니다.');});
 }
 function requestLocation(notify=false){
   if(!navigator.geolocation){renderLocation('이 브라우저는 위치 정보를 지원하지 않아요.');if(notify)announce('이 브라우저에서는 위치 정보를 사용할 수 없어요.');return;}
@@ -140,7 +135,7 @@ function applyOwnerIdentity(){
   const name=String(prefs.ownerName||'회장님').trim()||'회장님';
   const title=String(prefs.ownerTitle||'CEO').trim()||'CEO';
   const rank=String(prefs.ownerRank||'').trim().replace(/^#/,'');
-  const initials=Array.from(name.split(/\s+/).filter(Boolean).map(part=>Array.from(part)[0]).join('')).slice(0,2).join('').toUpperCase()||'TY';
+  const initials=Array.from(name.split(/\s+/).filter(Boolean).map(part=>Array.from(part)[0]).join('')).slice(0,2).join('').toUpperCase()||'CEO';
   const rankLabel=rank?` · 조직 서열 #${rank}`:'';
   $('#owner-name').textContent=name;$('#owner-title').textContent=`${title}${rankLabel}`;
   $('#owner-card').setAttribute('aria-label',`${name} 현재 위치 따라가기`);
@@ -149,7 +144,7 @@ function applyOwnerIdentity(){
   officeScene?.setOwnerIdentity({name,title,rank});
 }
 applyPrefs();
-function savePrefs(){try{localStorage.setItem('my-ai-office-preferences',JSON.stringify(prefs));}catch{}applyPrefs();queuePositions();}
+async function savePrefs(patch=prefs){try{const next=await savePreferences(patch);Object.assign(prefs,next);applyPrefs();queuePositions();return true;}catch(error){officeSettings.showError(error);announce(error.message);return false;}}
 function relativeTime(timestamp){const seconds=Math.max(0,Math.floor((Date.now()-Number(timestamp))/1000));if(seconds<10)return '방금 전';if(seconds<60)return `${seconds}초 전`;if(seconds<3600)return `${Math.floor(seconds/60)}분 전`;if(seconds<86400)return `${Math.floor(seconds/3600)}시간 전`;return `${Math.floor(seconds/86400)}일 전`;}
 function announce(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(announce.timer);announce.timer=setTimeout(()=>$('#toast').classList.remove('show'),2600);}
 function project(){return state.projects.find(item=>item.key===state.projectKey);}
@@ -356,15 +351,10 @@ $('#clear-room').addEventListener('click',()=>{state.selectedRoom=null;state.sel
 $$('[data-team]').forEach(button=>button.addEventListener('click',()=>{state.teamFilter=button.dataset.team;$$('[data-team]').forEach(tab=>tab.setAttribute('aria-selected',String(tab===button)));$('#team-list').setAttribute('aria-labelledby',button.id);renderTeam();}));
 for(const list of ['#team-list','#activity-strip','#activity-log'])$(list).addEventListener('click',event=>{const button=event.target.closest('[data-session]');if(!button)return;selectSession(button.dataset.session);if(list==='#activity-log'){$('#activity-dialog').close();$('#selected-detail').scrollIntoView({behavior:prefs.motion?'smooth':'instant',block:'nearest'});}});
 $('#selected-detail').addEventListener('click',event=>{if(event.target.closest('#close-detail')){state.selectedSession=null;renderDetail();updateSprites();}});
-$$('[data-view]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.view==='settings')openDialog('#settings-dialog');else if(button.dataset.view==='activity')openDialog('#activity-dialog');else{$('#office').scrollIntoView({behavior:prefs.motion?'smooth':'instant',block:'start'});}}));$('#activity-open').addEventListener('click',()=>openDialog('#activity-dialog'));
-$$('.close-dialog').forEach(button=>button.addEventListener('click',()=>button.closest('dialog').close()));$$('dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog){if(dialog.id==='office-setup-dialog')return;const b=dialog.getBoundingClientRect();if(event.clientX<b.left||event.clientX>b.right||event.clientY<b.top||event.clientY>b.bottom)dialog.close();}}));
+$$('[data-view]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.view==='settings')officeSettings.open();else if(button.dataset.view==='activity')openDialog('#activity-dialog');else{$('#office').scrollIntoView({behavior:prefs.motion?'smooth':'instant',block:'start'});}}));$('#activity-open').addEventListener('click',()=>openDialog('#activity-dialog'));
+$$('.close-dialog').forEach(button=>button.addEventListener('click',()=>button.closest('dialog').close()));$$('dialog').filter(dialog=>dialog.id!=='settings-dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog){if(dialog.id==='office-setup-dialog')return;const b=dialog.getBoundingClientRect();if(event.clientX<b.left||event.clientX>b.right||event.clientY<b.top||event.clientY>b.bottom)dialog.close();}}));
 $$('[data-activity]').forEach(button=>button.addEventListener('click',()=>{state.activityFilter=button.dataset.activity;$$('[data-activity]').forEach(item=>item.classList.toggle('selected',item===button));renderLog();}));
-$('#motion-setting').addEventListener('change',event=>{prefs.motion=event.target.checked;savePrefs();});$('#text-setting').addEventListener('change',event=>{prefs.largeText=event.target.checked;savePrefs();});$('#theme-setting').addEventListener('change',event=>{prefs.evening=event.target.checked;savePrefs();});
-$('#location-update').addEventListener('click',()=>requestLocation(true));
-$('#executive-suite-name-setting').addEventListener('input',event=>{prefs.executiveSuiteName=event.target.value.trim()||'EXECUTIVE SUITE';try{localStorage.setItem('my-ai-office-preferences',JSON.stringify(prefs));}catch{}renderHeader();renderBuilding();});
-for(const [id,key]of [['owner-name-setting','ownerName'],['owner-title-setting','ownerTitle'],['owner-rank-setting','ownerRank']])$(`#${id}`).addEventListener('input',event=>{prefs[key]=event.target.value;applyOwnerIdentity();try{localStorage.setItem('my-ai-office-preferences',JSON.stringify(prefs));}catch{}});
-$('#secretary-name-setting').addEventListener('input',event=>{prefs.secretaryName=event.target.value;officeScene?.setSecretaryIdentity(prefs.secretaryName);try{localStorage.setItem('my-ai-office-preferences',JSON.stringify(prefs));}catch{}});
-$('#office-setup-form').addEventListener('submit',event=>{event.preventDefault();const suiteName=$('#setup-suite-name').value.trim(),ownerName=$('#setup-owner-name').value.trim();if(!suiteName||!ownerName)return;prefs.executiveSuiteName=suiteName;prefs.ownerName=ownerName;savePrefs();$('#office-setup-dialog').close();render();renderBuilding();requestLocation(false);});
+$('#office-setup-form').addEventListener('submit',async event=>{event.preventDefault();const suiteName=$('#setup-suite-name').value.trim(),ownerName=$('#setup-owner-name').value.trim();if(!suiteName||!ownerName)return;const button=event.submitter;button.disabled=true;try{if(!await savePrefs({executiveSuiteName:suiteName,ownerName}))return;$('#office-setup-dialog').close();render();renderBuilding();requestLocation(false);}finally{button.disabled=false;}});
 $('#office-setup-dialog').addEventListener('cancel',event=>event.preventDefault());
 document.addEventListener('click',event=>{if(!event.target.closest('.floor-picker-wrap'))setMenu(false);});document.addEventListener('keydown',event=>{if(event.key==='Escape'){setMenu(false);if(state.focused){state.focused=false;$('#workspace-layout').classList.remove('focused');document.body.classList.remove('office-focus');$('#expand').setAttribute('aria-pressed','false');$('#expand').setAttribute('aria-label','업무 공간 크게 보기');$('#expand').title='업무 공간 크게 보기';fitViewport();}}});
 $('#scene-zoom-in').addEventListener('click',()=>officeScene?.setZoom(officeScene.zoom*1.15));
