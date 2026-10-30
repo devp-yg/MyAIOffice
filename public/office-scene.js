@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three/three.module.js';
+import { staffAppearance } from './staff-appearance.js';
 import { OfficeOwner } from './office-owner.js';
 import { buildExecutiveSuite as buildExecutiveInterior } from './office-executive-scene.js';
 import { SECRETARY_STATION, EXECUTIVE_INTERACTIONS } from './office-executive.js';
@@ -7,7 +8,6 @@ import { SecretaryRoutine, SECRETARY_STOPS } from './office-secretary.js';
 import { daylightAt, sunriseSunset } from './solar-time.js';
 import { OfficeVisitor } from './office-visitor.js';
 
-const PALETTES={studio:0x8fae83,library:0xd0ad76,server:0x89a9c7,research:0x83b3a2,meeting:0xb39ace,desk:0xd9ab83};
 const SECRETARY_LOOKS=[
  {top:0xd98f9f,bottom:0xe7d7b9,cut:'skirt',style:'blouse',hair:'long'},
  {top:0x52677b,bottom:0xd8d0c2,cut:'skirt',style:'blazer',hair:'ponytail'},
@@ -67,22 +67,50 @@ case 'globe':{const g=group(parent,item.x,0,item.z);cylinder(g,0xc1b18c,0,.45,0,
 export function disposeCharacter(model){
  const disposed=new Set();model.root.traverse(object=>{if(!object.isMesh)return;const geometry=object.geometry;if(![cubeGeometry,ballGeometry,cylinderGeometry].includes(geometry)&&!disposed.has(geometry)){geometry.dispose();disposed.add(geometry);}});model.selection.material.dispose();
 }
+function staffClothing(body,look){
+ const {style,accent,pattern}=look;
+ if(style==='hoodie'){
+  const hood=mesh(body,new THREE.TorusGeometry(.16,.055,6,16),look.top,0,.86,-.07);hood.rotation.x=.6;
+  box(body,accent,0,.51,.221,.26,.10,.025,false);
+  for(const x of [-.055,.055])box(body,accent,x,.80,.222,.012,.15,.018,false);
+ }else if(style==='blazer'||style==='vest'){
+  box(body,accent,0,.72,.216,.15,.28,.025,false);
+  for(const side of [-1,1]){const lapel=box(body,look.top,side*.073,.80,.242,.075,.22,.025,false);lapel.rotation.z=side*.25;}
+  if(style==='vest')for(const y of [.67,.59,.51])ball(body,accent,0,y,.237,.014,.014,.008,false);
+ }else if(style==='cardigan'){
+  box(body,accent,0,.70,.226,.045,.37,.025,false);
+  for(const y of [.80,.70,.60])ball(body,look.bottom,0,y,.247,.014,.014,.008,false);
+ }else if(style==='polo'){
+  for(const side of [-1,1]){const collar=box(body,accent,side*.05,.88,.19,.09,.07,.035,false);collar.rotation.z=side*.28;}
+  box(body,accent,0,.80,.224,.025,.12,.022,false);
+ }else if(style==='sweater'){
+  for(const x of [-.15,-.075,0,.075,.15])box(body,accent,x,.46,.207,.012,.07,.012,false);
+  cylinder(body,accent,0,.91,0,.135,.045);
+ }else if(style==='rugby'){
+  for(const y of [.56,.74])box(body,accent,0,y,.225,.36,.07,.025,false);
+  box(body,accent,0,.89,.19,.18,.07,.035,false);
+ }else if(style==='overshirt'){
+  for(const x of [-.115,.115]){box(body,accent,x,.73,.228,.10,.11,.025,false);box(body,look.bottom,x,.79,.244,.105,.025,.018,false);}
+  box(body,accent,0,.64,.232,.018,.34,.018,false);
+ }
+ if(pattern==='stripes')for(const y of [.60,.67,.74])box(body,accent,0,y,.256,.34,.018,.012,false);
+ if(pattern==='chest-band')box(body,accent,0,.66,.257,.36,.055,.015,false);
+ if(pattern==='piping')for(const side of [-1,1])box(body,accent,side*.18,.65,.194,.025,.28,.018,false);
+}
 export function createCharacter(parent,palette='studio',appearance={}){
- const characterIndex=Number(appearance.index)||0,styleIndex=characterIndex%8,variant=Math.floor(characterIndex/8)%4;const baseCoat=PALETTES[palette]||PALETTES.studio;
- // A stable appearance cycle gives employees different silhouettes while keeping a
- // small share of the team visibly feminine. Their index stays the same in both views.
- const feminineStyle=appearance.pregnant?'ponytail':!appearance.secretary&&!appearance.owner&&characterIndex%5===2?(Math.floor(characterIndex/5)%2?'ponytail':'bob'):null;
- const hairColors=[0x71503a,0x352c29,0x79513a,0x4b4542,0xa4774d,0x6f573f,0x3d302c,0x927b63];
- const skinTones=[0xf0c3a4,0xe4ad8d,0xc98d6c,0xa96f55,0x80513f,0xd5a27d];
- const hairColor=appearance.secretary?0xd4ad52:appearance.owner?0x503f36:hairColors[characterIndex%hairColors.length];
- const skin=appearance.secretary||appearance.owner?0xf0c3a4:skinTones[characterIndex%skinTones.length];
- const coatOffsets=[[-.035,0,-.045],[.025,.02,.025],[-.065,.025,.045],[.055,-.015,-.025],[.01,.045,-.055],[-.045,-.025,.035],[.07,.015,.005],[-.015,-.04,.06]][styleIndex];
+ const characterIndex=Number(appearance.index)||0,styleIndex=characterIndex%8;
+ const staff=!appearance.secretary&&!appearance.owner&&!appearance.pregnant;
+ const look=staffAppearance(characterIndex);
+ const hairStyle=appearance.pregnant?'ponytail':staff?look.hairStyle:['short','curls','short','curls','long','bun','long','swept'][styleIndex];
+ const hairColor=appearance.secretary?0xd4ad52:appearance.owner?0x503f36:appearance.pregnant?0x927b63:look.hair;
+ const skin=appearance.secretary||appearance.owner||appearance.pregnant?0xf0c3a4:look.skin;
  const outfit=appearance.secretaryOutfit||SECRETARY_LOOKS[0];
- const root=group(parent),body=group(root),coat=appearance.pregnant?0xc28da5:appearance.owner?0x354f5b:appearance.secretary?outfit.top:new THREE.Color(baseCoat).offsetHSL(coatOffsets[0]+(variant-1.5)*.012,coatOffsets[1],coatOffsets[2]+(variant-1.5)*.022).getHex();
+ const root=group(parent),body=group(root),coat=appearance.pregnant?0xc28da5:appearance.owner?0x354f5b:appearance.secretary?outfit.top:look.top;
+ if(staff){root.scale.setScalar(look.height);body.scale.x=look.width;}
  const secretaryTrousers=appearance.secretary&&outfit.cut==='trousers';
  const legOffset=appearance.secretary ? .09 : .13;
  const legL=group(body,-legOffset,.30,0),legR=group(body,legOffset,.30,0);
- for(const leg of [legL,legR]){cylinder(leg,appearance.secretary?(secretaryTrousers?outfit.bottom:skin):0x6b7562,0,secretaryTrousers?-.10:-.12,0,appearance.secretary?(secretaryTrousers?.082:.065):.09,secretaryTrousers?.36:.30);ball(leg,appearance.secretary?0x716659:0x635e4f,0,-.25,.065,appearance.secretary?.085:.115,appearance.secretary?.065:.075,appearance.secretary?.15:.17);}
+ for(const leg of [legL,legR]){cylinder(leg,appearance.secretary?(secretaryTrousers?outfit.bottom:skin):staff?look.bottom:0x6b7562,0,secretaryTrousers?-.10:-.12,0,appearance.secretary?(secretaryTrousers?.082:.065):.09,secretaryTrousers?.36:.30);ball(leg,appearance.secretary?0x716659:staff?look.shoes:0x635e4f,0,-.25,.065,appearance.secretary?.085:.115,appearance.secretary?.065:.075,appearance.secretary?.15:.17);}
  let belly=null;
  if(appearance.pregnant){
   mesh(body,new THREE.CapsuleGeometry(.22,.24,6,16),coat,0,.66,0,1,1,.95);
@@ -105,10 +133,12 @@ export function createCharacter(parent,palette='studio',appearance={}){
    for(const y of [.78,.70,.62])ball(body,0xf2e8d6,0,y,.239,.012,.012,.008,false);
   }
  }else mesh(body,new THREE.CapsuleGeometry(.22,.25,6,12),coat,0,.62,0);
+ if(staff)staffClothing(body,look);
  ball(body,skin,0,.94,.07,.12,.14,.11,false);
  const armL=group(body,-.255,.80,0),armR=group(body,.255,.80,0);
- for(const arm of [armL,armR]){mesh(arm,new THREE.CapsuleGeometry(.085,.24,4,10),coat,0,-.17,0);ball(arm,skin,0,-.32,.015,.075);}
+ for(const arm of [armL,armR]){mesh(arm,new THREE.CapsuleGeometry(.085,.24,4,10),staff&&look.style==='vest'?look.accent:coat,0,-.17,0);ball(arm,skin,0,-.32,.015,.075);}
  const head=group(body,0,1.2,0);
+ if(staff)head.scale.set(look.faceWidth,look.faceHeight,1);
  ball(head,skin,0,0,0,.35,.37,.31);
  // Hair covers the scalp and back; the face and rounded ears remain exposed.
  mesh(head,new THREE.SphereGeometry(1,20,14,0,Math.PI*2,0,1.2),hairColor,0,.005,-.015,.365,.385,.325);
@@ -131,33 +161,33 @@ export function createCharacter(parent,palette='studio',appearance={}){
    if(hair==='half-up')ball(head,0xe4c36f,0,.19,-.20,.12,.05,.04,false);
    if(hair==='braid')for(let i=0;i<5;i++)ball(head,hairColor,.30,-.34-i*.085,-.105,.055,.07,.065,false);
   }
- }else if(feminineStyle==='bob'){
+ }else if(hairStyle==='bob'){
   ball(head,hairColor,0,-.10,-.20,.31,.29,.18);
   for(const side of [-1,1])ball(head,hairColor,side*.30,-.11,-.025,.09,.29,.14);
- }else if(feminineStyle==='ponytail'){
+ }else if(hairStyle==='ponytail'){
   ball(head,hairColor,0,-.14,-.21,.30,.24,.16);
   for(const side of [-1,1])ball(head,hairColor,side*.30,-.12,-.03,.08,.22,.12);
   const pony=mesh(head,new THREE.CapsuleGeometry(.065,.36,5,8),hairColor,.17,-.31,-.23,1,1,1,false);pony.rotation.z=-.10;
   ball(head,0xe4c36f,.17,-.12,-.17,.05,.04,.04,false);
- }else if(styleIndex===1||styleIndex===3){
+ }else if(hairStyle==='curls'){
   // Tight curls add a round, textured silhouette.
   for(let row=0;row<2;row++)for(let i=0;i<7;i++){const angle=(i/7)*Math.PI*2;ball(head,hairColor,Math.cos(angle)*.27,.17+row*.09,Math.sin(angle)*.22,.105,.105,.10);}
- }else if(styleIndex===4||styleIndex===6){
+ }else if(hairStyle==='long'){
   // Longer, loose hair falls behind the ears.
   ball(head,hairColor,0,-.18,-.22,.30,.40,.16);
   for(const side of [-1,1])ball(head,hairColor,side*.30,-.22,-.04,.09,.39,.13);
- }else if(styleIndex===5){
+ }else if(hairStyle==='bun'){
   // A compact top knot with tapered side locks.
   ball(head,hairColor,0,.29,-.08,.20,.19,.18);
   for(const side of [-1,1])ball(head,hairColor,side*.31,-.10,-.03,.075,.23,.12);
   ball(head,0xe4c36f,0,.30,.02,.055,.04,.04,false);
- }else if(styleIndex===7){
+ }else if(hairStyle==='swept'){
   // Swept fringe and sideburns create a sharper short-hair profile.
   ball(head,hairColor,.08,.22,.24,.20,.07,.06);
   for(const side of [-1,1])ball(head,hairColor,side*.31,-.12,-.02,.07,.23,.12);
  }
  const eyes=group(head);
- for(const x of [-.115,.115]){ball(eyes,0x514e41,x,.035,.298,.028,.040,.018,false);ball(eyes,0xffffff,x+.008,.048,.314,.008,.009,.005,false);ball(head,0xedb9a7,x<0?-.216:.216,-.055,.246,.043,.025,.012,false);}
+ for(const x of staff?[-look.eyeSpacing,look.eyeSpacing]:[-.115,.115]){ball(eyes,0x514e41,x,.035,.298,.028,.040,.018,false);ball(eyes,0xffffff,x+.008,.048,.314,.008,.009,.005,false);ball(head,0xedb9a7,x<0?-.216:.216,-.055,.246,.043,.025,.012,false);}
  ball(head,skin,0,-.025,.312,.033,.045,.035,false);
  const smile=mesh(head,new THREE.TorusGeometry(.044,.009,5,12,Math.PI),0x9b785d,0,-.10,.302,1,1,1,false);smile.rotation.z=Math.PI;
  const glare=appearance.pregnant?group(head):null;
@@ -167,18 +197,18 @@ export function createCharacter(parent,palette='studio',appearance={}){
  }
  const fringe=ball(head,hairColor,appearance.secretary ? .015 : -.065,.216,.263,appearance.secretary ? .17 : .13,.045,.035,false);fringe.rotation.z=.28;
  if(appearance.secretary){for(const side of [-1,1]){const brow=box(head,0x8d6937,side*.115,.115,.289,.09,.018,.014,false);brow.rotation.z=side*.08;}}
- if(appearance.accessory==='glasses'){const frame=appearance.secretary?0xb18b55:0x76617e;for(const x of [-.115,.115])mesh(head,new THREE.TorusGeometry(.095,.013,6,24),frame,x,.035,.323,1,1,1,false);box(head,frame,0,.035,.327,.04,.015,.015,false);}
+ if(appearance.accessory==='glasses'){const frame=appearance.secretary?0xb18b55:0x76617e;for(const x of staff?[-look.eyeSpacing,look.eyeSpacing]:[-.115,.115])mesh(head,new THREE.TorusGeometry(.095,.013,6,24),frame,x,.035,.323,1,1,1,false);box(head,frame,0,.035,.327,.04,.015,.015,false);}
  if(appearance.owner){
   box(body,0xf9f0d7,0,.77,.215,.19,.24,.035);const tie=box(body,0xd4b650,0,.67,.24,.055,.24,.035);tie.rotation.z=.04;
   cylinder(head,0xd7b94f,0,.35,0,.30,.09);for(let i=0;i<5;i++){const angle=i*Math.PI*2/5;mesh(head,new THREE.ConeGeometry(.07,.22,4),0xe1c563,Math.sin(angle)*.25,.49,Math.cos(angle)*.25);}
   ball(body,0xe2c76d,.16,.76,.23,.07,.07,.025,false);box(body,0x665026,.16,.76,.26,.013,.073,.008,false);
  }else if(!appearance.pregnant){
  if(appearance.secretary){for(const side of [-1,1]){const collar=box(body,0xf4e4db,side*.055,.87,.192,.075,.10,.025,false);collar.rotation.z=side*.25;}if(outfit.style==='blouse')for(const y of [.78,.69,.60])ball(body,0xfff4e6,0,y,.224,.012,.012,.008,false);box(body,0xc4a45c,.14,.78,.218,.075,.045,.018,false);}
-  if(styleIndex===0||styleIndex===4)box(body,0xf3edd6,0,.5,.215,.28,.035,.025,false);
-  if(styleIndex===1||styleIndex===5)for(const side of [-1,1]){const lapel=box(body,0xf3edd6,side*.075,.78,.218,.10,.20,.018,false);lapel.rotation.z=side*.22;}
-  if(styleIndex===2||styleIndex===6){box(body,0xf3edd6,0,.89,.19,.18,.10,.035,false);box(body,0xe1bd72,0,.70,.226,.045,.22,.02,false);}
-  if(styleIndex===3||styleIndex===7)box(body,0xf3edd6,-.11,.70,.225,.11,.12,.025,false);
-  const accent=palette==='server'?0x537ea3:palette==='meeting'?0x8b6caa:0x638152;
+  if(!staff&&(styleIndex===0||styleIndex===4))box(body,0xf3edd6,0,.5,.215,.28,.035,.025,false);
+  if(!staff&&(styleIndex===1||styleIndex===5))for(const side of [-1,1]){const lapel=box(body,0xf3edd6,side*.075,.78,.218,.10,.20,.018,false);lapel.rotation.z=side*.22;}
+  if(!staff&&(styleIndex===2||styleIndex===6)){box(body,0xf3edd6,0,.89,.19,.18,.10,.035,false);box(body,0xe1bd72,0,.70,.226,.045,.22,.02,false);}
+  if(!staff&&(styleIndex===3||styleIndex===7))box(body,0xf3edd6,-.11,.70,.225,.11,.12,.025,false);
+  const accent=staff?look.accent:palette==='server'?0x537ea3:palette==='meeting'?0x8b6caa:0x638152;
   if(appearance.accessory==='beanie'){ball(head,0x697e4b,0,.24,0,.36,.19,.32);box(head,0xb1bd8a,0,.23,.27,.55,.08,.08);ball(head,0xc2cca1,0,.42,0,.09);}
   if(appearance.accessory==='cap'){ball(head,0xc9a34e,0,.23,0,.36,.14,.32);box(head,0xb69043,0,.24,.34,.48,.045,.26);}
   if(appearance.accessory==='headphones'){const band=mesh(head,new THREE.TorusGeometry(.39,.042,8,24,Math.PI),accent,0,.04,0);for(const x of [-.39,.39])ball(head,accent,x,.04,.03,.075,.14,.13);}
