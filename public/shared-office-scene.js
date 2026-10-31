@@ -65,8 +65,8 @@ function batchStatic(root){
 }
 
 export class SharedOfficeScene {
-  constructor(element,{onRoom,onActor,onOwner,onView,onWalkEnd,preferences={}}={}){
-    this.element=element;this.onRoom=onRoom;this.onActor=onActor;this.onOwner=onOwner;this.onView=onView;this.onWalkEnd=onWalkEnd;
+  constructor(element,{onRoom,onActor,onOwner,onOwnerStatus,onView,onWalkEnd,preferences={}}={}){
+    this.element=element;this.onRoom=onRoom;this.onActor=onActor;this.onOwner=onOwner;this.onOwnerStatus=onOwnerStatus;this.onView=onView;this.onWalkEnd=onWalkEnd;
     this.scene=new THREE.Scene();this.scene.background=DAY_BACKGROUND.clone();this.lightingMinute=-1;this.location=null;this.solarEvents=null;this.ambientFixtures=[];
     this.world=new THREE.Group();this.scene.add(this.world);this.camera=new THREE.OrthographicCamera(-24,24,16,-16,.1,180);
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
@@ -331,6 +331,7 @@ export class SharedOfficeScene {
     if(this.transition){const t=Math.min(1,(time-this.transition.start)/650),smooth=t*t*(3-2*t);this.viewTarget.lerpVectors(this.transition.from,this.transition.to,smooth);this.zoom=THREE.MathUtils.lerp(this.transition.zoomFrom,this.transition.zoomTo,smooth);this.resize();if(t===1)this.transition=null;}
     for(const actor of this.actors)this.updateActor(actor,dt,time);this.actors=this.actors.filter(actor=>!actor.departed);
     this.executive.update(dt,time,this.motion,this.actors);
+    if(this.ownerStatusText!==this.executive.patrol.text){this.ownerStatusText=this.executive.patrol.text;this.onOwnerStatus?.();}
     this.visitor.update(this.navigator,dt,time,this.motion,true,this.executive.spouseTargets());
     if(this.live){const actor=this.showPaths!==false&&(this.actors.find(a=>a.id===this.selectedId&&a.walker.walking)||this.actors.find(a=>a.model.root.visible&&a.walker.walking)),signature=actor?`${actor.id}:${actor.walker.route.length}:${actor.walker.destination.x}:${actor.walker.destination.z}`:'';if(signature!==this.routeSignature){this.routeSignature=signature;if(actor)this.drawRoute(actor);else this.clearRoute();}}
     this.updateLabels();this.renderer.render(this.scene,this.camera);

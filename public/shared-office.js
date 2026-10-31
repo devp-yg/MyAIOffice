@@ -48,7 +48,7 @@ function renderCounts(){
 }
 function refreshDetail(){
   if(!demo&&!latest){detail('실제 작업을 불러오는 중입니다','Codex의 프로젝트와 직원 정보를 연결하고 있어요.');return;}
-  if(scene.selectedOwner){$('#session-detail').hidden=true;detail(`${scene.executive.ownerName} · ${scene.executive.ownerTitle}`,'팀을 살펴보고 업무 진행 상황을 조율하고 있습니다.');return;}
+  if(scene.selectedOwner){$('#session-detail').hidden=true;detail(`${scene.executive.ownerName} · ${scene.executive.ownerTitle}`,scene.executive.patrol.text);return;}
   if(selectedSession){
     const actor=scene.actors.find(a=>a.id===selectedSession),session=demo?actor?.session:latest?.sessions.find(s=>s.id===selectedSession);
     if(actor||session){
@@ -126,7 +126,7 @@ const officeSettings=mountOfficeSettings({getPreferences:()=>preferences,onApply
 $('#open-settings').addEventListener('click',()=>officeSettings.open());
 try{
   scene=new SharedOfficeScene($('#study-canvas'),{
-    onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,preferences,
+    onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,onOwnerStatus:()=>{if(scene?.selectedOwner)refreshDetail();},preferences,
     onView:({zoom,elevation})=>{$('#zoom-label').textContent=`${Math.round(zoom*100)}%`;$$('[data-angle]').forEach(b=>{const selected=Math.abs(Number(b.dataset.angle)-elevation)<4;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});},
     onWalkEnd:()=>{if(demo){$('#walk-preview').setAttribute('aria-pressed','false');$('#walk-preview').lastChild.textContent=' 직원 동선 보기';}},
   });

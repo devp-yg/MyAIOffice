@@ -4,7 +4,7 @@ import {EXECUTIVE_ROOM_LAYOUT} from './office-executive.js';
 import {createCharacter,disposeCharacter,secretaryLookForDate} from './office-scene.js';
 import {OfficeNavigator,OfficeWalker,roomAt} from './office-navigation.js';
 import {SecretaryRoutine} from './office-secretary.js';
-import {CeoRoutine,CEO_ACTION_TEXT} from './ceo-routine.js';
+import {CeoRoutine,CEO_ACTION_TEXT,CEO_REST_ACTIONS,applyCeoRestPose} from './ceo-routine.js';
 
 const EXECUTIVE_ROOM_NAMES={library:'서재 · 기록실',studio:'비서실',server:'금고 · 기밀문서실',research:'프라이빗 라운지',meeting:'이사회실',desk:'CEO 집무실',reception:'접견실'};
 
@@ -121,15 +121,19 @@ export class SharedExecutiveWing {
   updateOwner(dt,time,motion,actors){
     const walker=this.ownerWalker,patrol=this.patrol,model=this.owner;if(!walker)return;
     const commanding=patrol.observeRequests(actors,time);
-    if(commanding)patrol.text=CEO_ACTION_TEXT.command;
-    else if(patrol.text===CEO_ACTION_TEXT.command)patrol.text=patrol.active?CEO_ACTION_TEXT[patrol.kind]:CEO_ACTION_TEXT.idle;
-    if(patrol.active){if(!walker.walking&&time>=patrol.dwellUntil)patrol.finish(time);}
-    else if(!commanding&&patrol.due(time)&&!walker.walking){
+    if(commanding&&patrol.active){patrol.cancel(time);walker.route=[];walker.pending=null;walker.walking=false;}
+    if(!commanding&&!patrol.active&&patrol.due(time)&&!walker.walking){
       const available=actors.filter(actor=>actor.model.root.visible&&actor.walker);
       const active=available.filter(actor=>actor.session?.active);
+      const activeWorkers=actors.filter(actor=>actor.session?.active&&!actor.leaving).length;
+      const rest=CEO_REST_ACTIONS[patrol.nextKind(activeWorkers,active.length)];
       const pool=active.length?active:available;
       let destination;
-      if(pool.length){
+      if(rest){
+        const local=this.navigator.station(rest.room,rest.slot),world=this.point(local.x,0,local.z);
+        const index=this.sharedNavigator.nearest(world);
+        if(index>=0)destination=this.sharedNavigator.point(index);
+      }else if(pool.length){
         const target=pool[patrol.visit%pool.length],origin=target.walker.position;patrol.face={x:origin.x,z:origin.z};
         const options=[[1.05,0],[-1.05,0],[0,1.05],[0,-1.05],[.85,.85],[-.85,-.85]]
           .map(([dx,dz])=>({x:origin.x+dx,z:origin.z+dz}))
@@ -139,23 +143,28 @@ export class SharedExecutiveWing {
           .sort((a,b)=>a.distance-b.distance);
         destination=options[0]?.point;
       }
-      if(!destination&&available.length){const seat=available[patrol.visit%available.length].seat;if(seat){const index=this.sharedNavigator.nearest({x:seat.x+1,z:seat.z});if(index>=0)destination=this.sharedNavigator.point(index);}}
+      if(!rest&&!destination&&available.length){const seat=available[patrol.visit%available.length].seat;if(seat){const index=this.sharedNavigator.nearest({x:seat.x+1,z:seat.z});if(index>=0)destination=this.sharedNavigator.point(index);}}
       if(destination){
-        patrol.begin(time,active.length);
+        patrol.begin(time,activeWorkers,active.length);
         walker.setDestination(destination,null);
       }
     }
     walker.tick(dt,1.9);
+    patrol.tick(time,{walking:walker.walking,blocked:walker.blocked});
+    if(commanding)patrol.text=CEO_ACTION_TEXT.command;
+    else if(patrol.text===CEO_ACTION_TEXT.command)patrol.text=CEO_ACTION_TEXT.idle;
     const position=walker.position,walking=walker.walking,cycle=walker.distanceWalked*12;
+    const resting=!commanding&&!walking&&patrol.rest;
     model.root.position.set(position.x,0,position.z);
-    const heading=walking?walker.heading:patrol.active&&patrol.kind==='encourage'&&patrol.face?Math.atan2(patrol.face.x-position.x,patrol.face.z-position.z):Math.PI;
+    const heading=walking?walker.heading:resting?this.layout.rotation+resting.heading:patrol.active&&patrol.kind==='encourage'&&patrol.face?Math.atan2(patrol.face.x-position.x,patrol.face.z-position.z):Math.PI;
     const delta=Math.atan2(Math.sin(heading-model.root.rotation.y),Math.cos(heading-model.root.rotation.y));model.root.rotation.y+=delta*Math.min(1,dt*9);
     model.body.position.y=motion?(walking?Math.abs(Math.sin(cycle))*.04:Math.sin(time*.002)*.01):0;
     model.legL.rotation.x=motion&&walking?Math.sin(cycle)*.46:0;model.legR.rotation.x=-model.legL.rotation.x;
     model.armL.rotation.x=walking&&motion?-Math.sin(cycle)*.38:-.2;
     model.armR.rotation.x=commanding?-1.7:walking&&motion?Math.sin(cycle)*.38:patrol.active&&patrol.kind==='encourage'&&time<patrol.dwellUntil?-.95:-.2;
     model.armR.rotation.z=motion&&patrol.active&&patrol.kind==='encourage'&&time<patrol.dwellUntil?Math.sin(time*.012)*.22:0;
-    for(const [key,prop]of Object.entries(model.props))prop.visible=key==='phone'&&commanding;
+    applyCeoRestPose(model,resting?patrol.kind:null,time,motion);
+    for(const [key,prop]of Object.entries(model.props))prop.visible=commanding?key==='phone':Boolean(resting?.prop&&key===resting.prop);
     model.eyes.scale.y=motion&&time%5400>5250?.1:1;
   }
   updateLabels(projectPoint,zoom){
