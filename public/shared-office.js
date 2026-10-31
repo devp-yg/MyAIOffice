@@ -1,3 +1,4 @@
+import {bindOfficeExpansion} from './office-frame.js';
 import {DEFAULT_PREFERENCES} from './office-preferences.js';
 import {loadPreferences,savePreferences,mountOfficeSettings} from './office-settings.js';
 import {SharedOfficeScene} from './shared-office-scene.js';
@@ -91,23 +92,6 @@ function applyLive(){
   if(selectedSession&&scene.actors.some(a=>a.id===selectedSession)&&!scene.selectedId)scene.selectActor(selectedSession);
 }
 function changeScenario(key){scenario=key;scene.project=project;scene.setScenario(key);$$('[data-scenario]').forEach(b=>{const selected=b.dataset.scenario===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});$('#scenario-description').textContent=`${SCENARIOS[key].name} · 예시 직원 ${scene.actors.length}명입니다.`;overview();}
-function stageIsFullscreen(stage){return document.fullscreenElement===stage||document.webkitFullscreenElement===stage;}
-function syncStageExpansion(){
-  const stage=$('.study-stage'),button=$('#stage-expand');if(!stage||!button)return;
-  const fallback=stage.classList.contains('stage-expanded');document.body.classList.toggle('stage-expanded',fallback);
-  const expanded=fallback||stageIsFullscreen(stage);button.setAttribute('aria-pressed',String(expanded));
-  button.setAttribute('aria-label',expanded?'Live 전체 화면 닫기':'Live 전체 화면으로 확대');button.title=expanded?'Live 전체 화면 닫기':'Live 전체 화면으로 확대';button.textContent=expanded?'⤢':'⛶';
-  requestAnimationFrame(()=>scene?.resize());
-}
-async function toggleStageExpansion(){
-  const stage=$('.study-stage');if(!stage)return;
-  if(stage.classList.contains('stage-expanded')){stage.classList.remove('stage-expanded');syncStageExpansion();$('#stage-expand').focus();return;}
-  if(stageIsFullscreen(stage)){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)await exit.call(document);syncStageExpansion();return;}
-  const request=stage.requestFullscreen||stage.webkitRequestFullscreen;
-  if(request){try{await request.call(stage);}catch{stage.classList.add('stage-expanded');}}
-  else stage.classList.add('stage-expanded');
-  syncStageExpansion();
-}
 function toggleDemo(){
   demo=!demo;selectedRoom=null;selectedSession=null;scene.stopWalk();$('#project-search').value='';$('#demo-controls').hidden=!demo;$('#live-info').hidden=demo;$('#live-roster').hidden=demo;$('#source-switch').textContent=demo?'실제 작업으로':'둘러보기';$('#source-switch').setAttribute('aria-pressed',String(demo));$('#staff-total-label').textContent=demo?'예시 직원':'작업 중';$('#source-note-title').textContent=demo?'예시 데이터 · DEMO':'로컬 Codex 연결';$('#source-note').textContent=demo?'공간을 살펴보기 위한 예시 직원과 프로젝트입니다.':'업무가 바뀌면 직원이 다음 공간으로 이동합니다.';
   if(demo){rememberedProject=project;project=null;projects=PREVIEW_PROJECTS;changeScenario(scenario);}
@@ -149,9 +133,7 @@ try{
   $('#zoom-in').addEventListener('click',()=>scene.setZoom(scene.zoom*1.2));$('#zoom-out').addEventListener('click',()=>scene.setZoom(scene.zoom/1.2));
   $('#labels-toggle').addEventListener('click',()=>{scene.showLabels=!scene.showLabels;$('#labels-toggle').setAttribute('aria-pressed',String(scene.showLabels));scene.updateLabels();});
   $('#motion-toggle').addEventListener('click',async()=>{try{applyPreferences(await savePreferences({motion:!scene.motion}));}catch(error){announce(error.message);officeSettings.showError(error);}});
-  $('#stage-expand').addEventListener('click',toggleStageExpansion);
-  document.addEventListener('fullscreenchange',syncStageExpansion);document.addEventListener('webkitfullscreenchange',syncStageExpansion);
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('.study-stage').classList.contains('stage-expanded')){$('.study-stage').classList.remove('stage-expanded');syncStageExpansion();}});
+  bindOfficeExpansion({stage:$('.study-stage'),button:$('#stage-expand'),onResize:()=>scene?.resize()});
   $('#walk-preview').addEventListener('click',()=>{if(!demo){scene.showPaths=scene.showPaths===false;scene.routeSignature='force';$('#walk-preview').setAttribute('aria-pressed',String(scene.showPaths));}else if(!scene.walkActor&&scene.startWalk()){$('#walk-preview').setAttribute('aria-pressed','true');$('#walk-preview').lastChild.textContent=' 정원을 돌아오는 중';}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)feed.refresh();});
   addEventListener('pagehide',event=>{if(!event.persisted){feed.stop();scene.destroy();}});

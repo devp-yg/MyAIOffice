@@ -2,28 +2,28 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f6f7f3"><title>넓은 오피스 · My AI Office</title>
+  <meta name="theme-color" content="#f7f8f3"><title>넓은 오피스 · My AI Office</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/shared-office.css?v=20261021-2">
-  <link rel="stylesheet" href="/office-settings.css"><link rel="stylesheet" href="/sidebar-typography.css">
+  <link rel="stylesheet" href="/office-frame.css"><link rel="stylesheet" href="/office-settings.css"><link rel="stylesheet" href="/sidebar-typography.css">
 </head>
-<body>
+<body class="office-frame shared-office" data-office-view="shared">
   <a class="skip" href="#study-canvas">3D 오피스로 이동</a>
-  <header class="study-header">
+  <header class="study-header office-header">
     <div class="wordmark">my<span>ai</span>office<span class="wordmark-dot">.</span><span class="version">LOCAL WORKSPACE</span></div>
     <nav class="office-view-switch" aria-label="오피스 보기"><a href="/shared-office.html" aria-current="page">공용 오피스</a><a id="tower-link" href="/">타워 오피스</a></nav>
     <div class="live-header-actions"><button id="open-settings" class="open-office-settings" type="button" aria-haspopup="dialog">⚙ 설정</button><span id="connection-status" role="status" class="connection-status loading">연결 중</span><button id="refresh-live" class="refresh-live" aria-label="실제 작업 새로고침" title="실제 작업 새로고침">↻</button><button id="source-switch" class="source-switch" aria-pressed="false">둘러보기</button></div>
   </header>
-  <main>
-    <section class="study-heading"><div><p class="eyebrow">ONE FLOOR, MANY POSSIBILITIES</p><h1>넓은 공용 오피스<span>.</span></h1><p class="intro">업무를 따라 모이고, 여러 프로젝트가 함께 일하는 공간.</p></div><div class="study-metrics"><div><span>공간</span><strong id="space-size">40 <small>×</small> 24<small>m</small></strong></div><div><span id="staff-total-label">작업 중</span><strong id="staff-total">0<small>명</small></strong></div><div><span>프로젝트</span><strong id="project-total">0<small>개</small></strong></div></div></section>
-    <div class="study-workspace">
-      <aside class="study-sidebar" aria-label="공간과 프로젝트 보기">
+  <main class="office-main">
+    <section class="study-heading office-intro"><div><p class="eyebrow">ONE FLOOR, MANY POSSIBILITIES</p><h1>넓은 공용 오피스<span>.</span></h1><p class="intro">업무를 따라 모이고, 여러 프로젝트가 함께 일하는 공간.</p></div><div class="study-metrics office-metrics"><div><span>공간</span><strong id="space-size">40 <small>×</small> 24<small>m</small></strong></div><div><span id="staff-total-label">작업 중</span><strong id="staff-total">0<small>명</small></strong></div><div><span>프로젝트</span><strong id="project-total">0<small>개</small></strong></div></div></section>
+    <div class="study-workspace office-workspace">
+      <aside class="study-sidebar office-sidebar" aria-label="공간과 프로젝트 보기">
         <section><div class="section-label">EXPLORE THE OFFICE</div><h2>공간 둘러보기</h2><button class="overview-button selected" id="overview" aria-pressed="true"><span class="room-icon">⌂</span><span>전체 오피스</span><span>↗</span></button><div id="room-list" class="room-list"></div></section>
         <section class="project-section"><div class="section-heading"><h2>프로젝트 보기</h2><button id="all-projects" class="text-button" aria-pressed="true">전체</button></div><input id="project-search" type="search" placeholder="프로젝트 찾기" aria-label="프로젝트 찾기"><div id="project-list" class="project-list"></div><p id="project-empty" hidden>조건에 맞는 프로젝트가 없어요.</p><p>프로젝트 선택으로 직원 위치를 살펴보세요.</p></section>
         <section id="live-info" class="occupancy-section"><div class="section-label">LIVE WORKSPACE</div><h2>실제 Codex 작업</h2><p id="live-summary">이 PC의 작업을 불러오는 중입니다.</p><label class="resting-option"><input id="show-resting" type="checkbox" checked>쉬는 직원도 보기</label><p id="resting-description">프로젝트마다 가장 최근에 쉬는 직원 한 명을 함께 표시합니다.</p><p id="last-updated">연결을 기다리는 중</p></section>
         <section id="demo-controls" class="occupancy-section" hidden><div class="section-label">PEOPLE & SPACE · DEMO</div><h2>함께 일하는 규모</h2><div class="scenario-list" role="group" aria-label="예시 직원 수"><button data-scenario="calm" aria-pressed="false"><strong>12</strong><span>여유롭게</span></button><button data-scenario="together" aria-pressed="false"><strong>24</strong><span>여러 프로젝트</span></button><button data-scenario="full" class="selected" aria-pressed="true"><strong>42</strong><span>기준 배치</span></button><button data-scenario="busy" aria-pressed="false"><strong>60</strong><span>포드 확장</span></button></div><p id="scenario-description">예시 직원으로 공간을 둘러봅니다.</p></section>
         <div class="preview-note"><i></i><div><strong id="source-note-title">로컬 Codex 연결</strong><p id="source-note">업무가 바뀌면 직원이 다음 공간으로 이동합니다.</p></div></div>
       </aside>
-      <section class="study-stage" aria-label="3D 공용 오피스 시안">
+      <section class="study-stage office-stage-card" aria-label="3D 공용 오피스 시안">
         <div class="stage-top"><div><span id="stage-source" class="study-status"><i></i><span>LIVE · 연결 중</span></span><span class="stage-scale" id="stage-population">공용 업무층</span></div><div class="angle-controls" role="group" aria-label="카메라 각도"><button data-angle="41" class="selected" aria-pressed="true">입체</button><button data-angle="80" aria-pressed="false">위에서</button></div></div>
         <div id="study-canvas" class="study-canvas" tabindex="-1"></div>
         <div id="study-detail" class="study-detail"><span class="detail-dot"></span><div><strong>정원을 중심으로 이어지는 다섯 업무 구역</strong><p>공간이나 직원을 눌러 가까이에서 살펴보세요.</p></div></div>
@@ -31,8 +31,8 @@
         <div class="stage-bottom"><span>드래그로 회전 <i>·</i> 스크롤로 확대 <i>·</i> Shift + 드래그로 이동</span><span id="zoom-label">100%</span></div>
       </section>
     </div>
-    <section id="live-roster" class="live-roster"><div class="roster-heading"><div><h2>최근 직원과 작업</h2><p id="roster-summary">작업을 불러오는 중</p></div><div role="group" aria-label="직원 목록 필터"><button data-roster="all" aria-pressed="true">전체</button><button data-roster="active" aria-pressed="false">작업 중</button><button data-roster="resting" aria-pressed="false">응답 대기·휴식</button></div></div><div id="session-list" class="session-list"></div><div id="session-detail" class="session-detail" hidden><div><strong></strong><p></p></div><a id="session-tower-link" href="/">타워에서 보기 ↗</a><button id="close-session" aria-label="직원 상세 닫기">×</button></div></section>
-    <footer class="study-footer"><span>MY AI OFFICE <i>—</i> 공간을 함께 다듬는 중</span><span>프로젝트는 자동으로 구분하고, 모든 업무 공간은 함께 사용합니다.</span></footer>
+    <section id="live-roster" class="live-roster office-roster"><div class="roster-heading"><div><h2>최근 직원과 작업</h2><p id="roster-summary">작업을 불러오는 중</p></div><div role="group" aria-label="직원 목록 필터"><button data-roster="all" aria-pressed="true">전체</button><button data-roster="active" aria-pressed="false">작업 중</button><button data-roster="resting" aria-pressed="false">응답 대기·휴식</button></div></div><div id="session-list" class="session-list"></div><div id="session-detail" class="session-detail" hidden><div><strong></strong><p></p></div><a id="session-tower-link" href="/">타워에서 보기 ↗</a><button id="close-session" aria-label="직원 상세 닫기">×</button></div></section>
+    <footer class="study-footer office-footer"><span>MY AI OFFICE <i>—</i> 공간을 함께 다듬는 중</span><span>프로젝트는 자동으로 구분하고, 모든 업무 공간은 함께 사용합니다.</span></footer>
   </main>
   <div id="study-announcement" class="sr-only" role="status" aria-live="polite"></div>
   <script type="module" src="/shared-office.js?v=20261024-1"></script>

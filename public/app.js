@@ -1,3 +1,4 @@
+import {bindOfficeExpansion} from './office-frame.js';
 import {DEFAULT_PREFERENCES} from './office-preferences.js';
 import {loadPreferences,savePreferences,mountOfficeSettings} from './office-settings.js';
 import { characterSvg } from './office-art.js';
@@ -34,7 +35,7 @@ try{saved=await loadPreferences();}catch(error){saved=error.preferences||{};sett
 const needsOfficeSetup=!String(saved.executiveSuiteName||'').trim()||!String(saved.ownerName||'').trim();
 const motionQuery=matchMedia('(prefers-reduced-motion: reduce)');
 const prefs={...DEFAULT_PREFERENCES,motion:!motionQuery.matches,...saved};
-const state={sessions:[],archives:[],projects:[],projectKey:null,archiveView:false,selectedArchive:null,selectedRoom:null,selectedSession:null,teamFilter:'all',activityFilter:'all',demo:false,focused:false,connected:false,checkedAt:null,dataReady:false};
+const state={sessions:[],archives:[],projects:[],projectKey:null,archiveView:false,selectedArchive:null,selectedRoom:null,selectedSession:null,teamFilter:'all',activityFilter:'all',demo:false,connected:false,checkedAt:null,dataReady:false};
 function stored(key){try{return JSON.parse(localStorage.getItem(key)||'{}');}catch{return {};}}
 let directory=new BuildingDirectory(stored('office-floor-registry')),identities=new StaffIdentities(stored('office-staff-registry'));
 let realFloorRegistry=directory.registry,realStaffRegistry=identities.registry,registryReady=false,registrySignature='',registryWriteQueue=Promise.resolve();
@@ -135,11 +136,9 @@ function applyOwnerIdentity(){
   const name=String(prefs.ownerName||'회장님').trim()||'회장님';
   const title=String(prefs.ownerTitle||'CEO').trim()||'CEO';
   const rank=String(prefs.ownerRank||'').trim().replace(/^#/,'');
-  const initials=Array.from(name.split(/\s+/).filter(Boolean).map(part=>Array.from(part)[0]).join('')).slice(0,2).join('').toUpperCase()||'CEO';
   const rankLabel=rank?` · 조직 서열 #${rank}`:'';
   $('#owner-name').textContent=name;$('#owner-title').textContent=`${title}${rankLabel}`;
   $('#owner-card').setAttribute('aria-label',`${name} 현재 위치 따라가기`);
-  $('#owner-avatar').textContent=initials;$('#owner-avatar').title=`${name} · ${title}${rank?` · #${rank}`:''}`;
   $('#owner-portrait').innerHTML=ownerPortrait(rank);
   officeScene?.setOwnerIdentity({name,title,rank});
 }
@@ -156,7 +155,7 @@ function sessionName(session){return session.identity?.name||'Alex';}
 function shortName(session){return sessionName(session);}
 function paletteFor(session){if(session.identity?.palette)return session.identity.palette;if(session.palette)return session.palette;if(!session.hasParent)return 'studio';if(/plan/i.test(session.role||''))return 'meeting';if(/explore|research/i.test(session.role||''))return 'research';return ['library','server','research','meeting'][(session.id.charCodeAt(0)||0)%4];}
 function filteredSessions(){return projectSessions().filter(item=>!state.selectedRoom||visualRoom(item)===state.selectedRoom);}
-function setConnection(connected){state.connected=connected;$('#connection').classList.toggle('offline',!connected&&!state.demo);$('#connection-text').textContent=state.demo?'예시 사무실 둘러보는 중':connected?'이 PC의 Codex에 연결됨':'연결을 다시 확인하는 중';}
+function setConnection(connected){state.connected=connected;$('#connection').classList.toggle('offline',!connected&&!state.demo);$('#connection').classList.toggle('demo',state.demo);$('#connection').classList.remove('loading');$('#connection-text').textContent=state.demo?'DEMO':connected?'로컬 연결':'연결 끊김';}
 function renderProjects(){const query=$('#project-search').value.normalize('NFC').toLocaleLowerCase();const items=state.projects.filter(item=>item.name.normalize('NFC').toLocaleLowerCase().includes(query));$('#project-list').innerHTML=items.length?items.map(item=>`<button class="project-option" role="option" aria-selected="${item.key===state.projectKey}" data-project="${escapeHtml(item.key)}"><span>${item.number}F</span><strong>${escapeHtml(item.name)}</strong><small>${item.active?`● ${item.active}명 작업 중`:`${item.count}개 세션`}</small></button>`).join(''):'<div class="team-empty">프로젝트가 없어요.</div>';}
 function renderHeader(){const item=project(),executive=isExecutiveFloor()&&!state.archiveView;$('#floor-number').textContent=state.archiveView?'B1':`${item?.number||'—'}F`;$('#office-heading').textContent=state.archiveView?'기록 문서 보관실':executive?prefs.executiveSuiteName:item?.name||'나의 작업 공간';$('#floor-picker').disabled=state.archiveView;$('#floor-picker').setAttribute('aria-label',state.archiveView?'기록 문서 보관실':'프로젝트 층 선택');$('#active-count').textContent=state.sessions.filter(item=>item.active).length;$('#project-count').textContent=state.projects.length;$('#agent-count').textContent=state.sessions.filter(item=>item.hasParent).length;$('#live-badge').innerHTML=state.demo?'<i></i> DEMO':'<i></i> LIVE';$('#live-badge').classList.toggle('demo',state.demo);$('#demo-toggle').setAttribute('aria-pressed',String(state.demo));$('#demo-toggle').querySelector('span').textContent=state.demo?'실제 세션으로':'둘러보기';$('#demo-toggle').title=state.demo?'실제 Codex 세션으로 돌아가기':'예시 캐릭터로 사무실 둘러보기';$('#office-hint').textContent=state.archiveView?'완료했거나 한동안 활동이 없는 채팅 기록을 모아 두었어요.':state.selectedRoom?`${roomName(state.selectedRoom)} · ${filteredSessions().length}개 세션을 보고 있어요.`:state.demo?'둘러보기의 캐릭터와 활동은 예시입니다. 버튼을 다시 누르면 실제 세션으로 돌아가요.':'방을 누르면 누가, 어떤 일을 하고 있는지 더 자세히 볼 수 있어요.';const keys=state.archiveView?['library']:executive?Object.keys(executiveRooms):Object.keys(rooms).filter(key=>key!=='reception'),details=state.archiveView?{library:{name:'기록 보관실',purpose:'완료된 채팅과 업무 기록',empty:'보관된 채팅 기록을 살펴보는 공간'}}:executive?executiveRooms:rooms;$('#floor-plan').classList.toggle('executive-plan',executive);$('#floor-plan').classList.toggle('archive-plan',state.archiveView);$('.scene-caption strong').textContent=state.archiveView?'RECORDS ROOM · B1':executive?prefs.executiveSuiteName.toLocaleUpperCase():'OUR LITTLE OFFICE';$('#floor-plan').innerHTML=keys.map(key=>{const room=details[key];return `<button class="space-button ${key}" data-room="${key}" aria-pressed="${state.selectedRoom===key}"><span class="space-title"><i></i><h3>${room.name}</h3><span class="room-population"></span></span><span class="room-purpose">${room.purpose}</span><span class="room-state"><span>${room.empty}</span></span></button>`;}).join('');$('#clear-room').hidden=!state.selectedRoom;$('#archive-panel-content').hidden=!state.archiveView;$('#people-panel').classList.toggle('archive-mode',state.archiveView);if(state.archiveView)renderArchives();updateTime();if(!$('#project-menu').hidden)renderProjects();}
 function updateTime(){if(state.checkedAt)$('#updated-time').textContent=state.demo?'예시 데이터 · 실제 Codex 작업과 구분돼요':`${timeFormat.format(new Date(state.checkedAt))}에 확인 · 로컬 연결`;}
@@ -192,20 +191,8 @@ function updateMovementSummary(){
   const extra=projectSessions().filter(s=>s.active&&!mapSessions().some(shown=>shown.id===s.id)).length;
   $('#scene-movement').textContent=`${isExecutiveFloor()?'CEO 전용 최상층 · ':''}호출 ${counts.receiving} · 이동 ${counts.walking} · 작업 ${counts.working} · 휴식 ${counts.resting}${extra?` · 추가 작업 ${extra}개는 팀 목록에서`:''}`;
 }
-function positionSprites(){officeScene?.resize();$('#layout-indicator').textContent='3D · 16:9 · 엘리베이터와 복도로 이동';}
-function fitViewport(){
-  document.body.classList.toggle('compact',innerHeight<960&&innerWidth>850);
-  const stage=$('#office-stage');
-  const boundary=$('.stage-boundary');
-  if(boundary.clientWidth>780){
-    const top=stage.getBoundingClientRect().top+scrollY;
-    const bottom=$('.office-bottom').offsetHeight+$('.office-hint').offsetHeight+18;
-    const height=Math.max(440,innerHeight-top-bottom);
-    const width=Math.max(780,Math.floor(height*16/9));
-    stage.style.maxWidth=`${width}px`;
-  }else stage.style.maxWidth='';
-  queuePositions();
-}
+function positionSprites(){officeScene?.resize();$('#layout-indicator').textContent='3D · 엘리베이터와 복도로 이동';}
+function fitViewport(){queuePositions();}
 function queuePositions(){cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(positionSprites);}
 function memberMarkup(session){const room=visualRoom(session);const motion=officeScene?.getStatus(session.id);const moving=motion?.phase==='walking',receiving=motion?.phase==='receiving';const idleText=session.finished?'작업 완료 · 휴식 중':'응답 대기 중';const action=receiving?'☎ CEO의 원격 지시를 받는 중':moving?`${rooms[room].name}로 걸어가는 중`:`${rooms[room].name} · ${session.active?rooms[room].short:idleText}`;return `<button class="team-member ${state.selectedSession===session.id?'selected':''}" data-session="${escapeHtml(session.id)}" aria-label="${escapeHtml(sessionName(session))} 상세 보기"><span class="member-avatar">${characterSvg(room,{palette:paletteFor(session),idle:!session.active,error:session.error,accessory:session.identity?.accessory,index:session.identity?.index})}<i class="member-dot ${session.active?'':'idle'}"></i></span><span class="member-copy"><strong>${escapeHtml(sessionName(session))}${session.hasParent?' <span aria-label="서브에이전트">↗</span>':''}</strong><small>${action}</small></span><span class="member-tag ${session.error?'error':session.active?'':'idle'}">${receiving?'전화 수신':moving?'이동 중':session.error?'확인 중':session.active?'작업 중':session.finished?'완료':'응답 대기'}</span></button>`;}
 function renderTeam(){const list=filteredSessions();const active=list.filter(session=>session.active);const display=state.teamFilter==='active'?active:list;$('#team-count').textContent=list.length;$('#tab-all-count').textContent=list.length;$('#tab-active-count').textContent=active.length;$('#team-list').innerHTML=display.length?display.map(memberMarkup).join(''):`<div class="team-empty">${characterSvg('studio',{idle:true})}<strong>${state.teamFilter==='active'?'지금은 쉬는 시간이에요':'아직 조용한 사무실이에요'}</strong><p>${state.teamFilter==='active'?'새 작업이 시작되면 여기에 나타나요.':'Codex가 작업을 시작하면 친구가 출근해요.'}</p></div>`;renderDetail();}
@@ -347,7 +334,7 @@ $('#owner-card').addEventListener('click',followOwner);
 $('#camera-elevation').addEventListener('input',event=>officeScene?.setElevation(event.target.value));
 $$('[data-camera-angle]').forEach(button=>button.addEventListener('click',()=>officeScene?.setElevation(button.dataset.cameraAngle)));
 $('#floor-picker').addEventListener('click',()=>setMenu($('#project-menu').hidden));$('#project-search').addEventListener('input',renderProjects);$('#project-list').addEventListener('click',event=>{const button=event.target.closest('[data-project]');if(button)setProject(button.dataset.project);});$('#floor-plan').addEventListener('click',event=>{const room=event.target.closest('[data-room]');if(room)selectRoom(room.dataset.room);});
-$('#clear-room').addEventListener('click',()=>{state.selectedRoom=null;state.selectedSession=null;render();});$('#refresh').addEventListener('click',refresh);$('#demo-toggle').addEventListener('click',toggleDemo);$('#expand').addEventListener('click',()=>{state.focused=!state.focused;$('#workspace-layout').classList.toggle('focused',state.focused);document.body.classList.toggle('office-focus',state.focused);$('#expand').setAttribute('aria-pressed',String(state.focused));$('#expand').setAttribute('aria-label',state.focused?'기본 배치로 돌아가기':'업무 공간 크게 보기');$('#expand').title=state.focused?'기본 배치로 돌아가기':'업무 공간 크게 보기';fitViewport();});
+$('#clear-room').addEventListener('click',()=>{state.selectedRoom=null;state.selectedSession=null;render();});$('#refresh').addEventListener('click',refresh);$('#demo-toggle').addEventListener('click',toggleDemo);bindOfficeExpansion({stage:$('#office'),button:$('#expand'),onResize:()=>officeScene?.resize()});
 $$('[data-team]').forEach(button=>button.addEventListener('click',()=>{state.teamFilter=button.dataset.team;$$('[data-team]').forEach(tab=>tab.setAttribute('aria-selected',String(tab===button)));$('#team-list').setAttribute('aria-labelledby',button.id);renderTeam();}));
 for(const list of ['#team-list','#activity-strip','#activity-log'])$(list).addEventListener('click',event=>{const button=event.target.closest('[data-session]');if(!button)return;selectSession(button.dataset.session);if(list==='#activity-log'){$('#activity-dialog').close();$('#selected-detail').scrollIntoView({behavior:prefs.motion?'smooth':'instant',block:'nearest'});}});
 $('#selected-detail').addEventListener('click',event=>{if(event.target.closest('#close-detail')){state.selectedSession=null;renderDetail();updateSprites();}});
@@ -356,7 +343,7 @@ $$('.close-dialog').forEach(button=>button.addEventListener('click',()=>button.c
 $$('[data-activity]').forEach(button=>button.addEventListener('click',()=>{state.activityFilter=button.dataset.activity;$$('[data-activity]').forEach(item=>item.classList.toggle('selected',item===button));renderLog();}));
 $('#office-setup-form').addEventListener('submit',async event=>{event.preventDefault();const suiteName=$('#setup-suite-name').value.trim(),ownerName=$('#setup-owner-name').value.trim();if(!suiteName||!ownerName)return;const button=event.submitter;button.disabled=true;try{if(!await savePrefs({executiveSuiteName:suiteName,ownerName}))return;$('#office-setup-dialog').close();render();renderBuilding();requestLocation(false);}finally{button.disabled=false;}});
 $('#office-setup-dialog').addEventListener('cancel',event=>event.preventDefault());
-document.addEventListener('click',event=>{if(!event.target.closest('.floor-picker-wrap'))setMenu(false);});document.addEventListener('keydown',event=>{if(event.key==='Escape'){setMenu(false);if(state.focused){state.focused=false;$('#workspace-layout').classList.remove('focused');document.body.classList.remove('office-focus');$('#expand').setAttribute('aria-pressed','false');$('#expand').setAttribute('aria-label','업무 공간 크게 보기');$('#expand').title='업무 공간 크게 보기';fitViewport();}}});
+document.addEventListener('click',event=>{if(!event.target.closest('.floor-picker-wrap'))setMenu(false);});document.addEventListener('keydown',event=>{if(event.key==='Escape')setMenu(false);});
 $('#scene-zoom-in').addEventListener('click',()=>officeScene?.setZoom(officeScene.zoom*1.15));
 $('#scene-zoom-out').addEventListener('click',()=>officeScene?.setZoom(officeScene.zoom/1.15));
 $('#scene-reset').addEventListener('click',()=>officeScene?.resetView());
