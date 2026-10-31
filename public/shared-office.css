@@ -77,3 +77,25 @@ body.stage-expanded{overflow:hidden}.study-stage:fullscreen,.study-stage:-webkit
 
 .study-executive-person.owner:not(.selected){background:#fff5d9;border-color:#d4b15f;color:#665329;box-shadow:0 2px 8px #8b702018}
 .study-executive-person.secretary{background:#e7f1e5!important;border-color:#9cb997!important;color:#496349!important;box-shadow:0 2px 8px #49634918}
+
+/* Make the staff roster readable, including supporting text and long task names. */
+.live-roster .roster-heading { flex-wrap: wrap; }
+.live-roster .roster-heading h2 { font-size: 18px; font-weight: 750; }
+.live-roster .roster-heading p { color: #586b50; font-size: 13px; font-weight: 600; line-height: 1.6; }
+.live-roster .roster-heading > div:last-child { flex-wrap: wrap; }
+.live-roster .roster-heading button { padding: 7px 12px; color: #586b50; font-size: 12px; font-weight: 650; }
+.live-roster .roster-heading button[aria-pressed=true] { color: #425d36; }
+.live-roster .session-list { gap: 10px; max-height: 360px; }
+.live-roster .session-card { min-height: 82px; padding: 13px 14px; gap: 10px; }
+.live-roster .session-card strong { color: var(--ink); font-size: 14px; font-weight: 700; line-height: 1.5; }
+.live-roster .session-card small { margin-top: 5px; color: #586b50; font-size: 13px; font-weight: 500; line-height: 1.6; }
+.live-roster .session-card strong,
+.live-roster .session-card small { white-space: normal; overflow-wrap: anywhere; }
+.live-roster .session-card > span:last-child { color: #586b50; font-size: 12px; font-weight: 650; }
+.live-roster .session-card .active { color: #426b37!important; }
+.live-roster .session-card .error { color: #97532c!important; }
+.live-roster .session-detail > div { min-width: 0; overflow-wrap: anywhere; }
+.live-roster .session-detail strong { font-size: 15px; font-weight: 700; }
+.live-roster .session-detail p { color: #586b50; font-size: 13px; font-weight: 500; line-height: 1.6; }
+.live-roster .session-detail > a { color: #425d36; font-size: 13px; font-weight: 650; }
+.live-roster .roster-empty { color: #586b50; font-size: 14px; font-weight: 500; }
