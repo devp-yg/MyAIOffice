@@ -3,7 +3,7 @@ import { SECRETARY_STATION } from './office-executive.js';
 
 export const SECRETARY_STOPS = {
   home:{room:'studio',x:SECRETARY_STATION.x+.18,z:SECRETARY_STATION.z,face:{x:-8.4,z:.4}},
-  pantry:{room:'research',x:5.25,z:-2.15,face:{x:6.35,z:-1.4}},
+  pantry:{room:'studio',x:-6.45,z:.2,face:{x:-6.45,z:1.1}},
   ceo:{room:'desk',x:-2.5,z:-1.2,face:{x:-.85,z:-1.6}},
   reception:{room:'reception',x:-8.65,z:-3.15,face:{x:-8.65,z:-4.35}},
   office:{room:'desk',x:-2.1,z:-2.15,face:{x:-2,z:-3.2}},
@@ -14,24 +14,25 @@ const work=(stop,text,action,duration,prop='clipboard',service=null)=>({stop,tex
 
 // This clock advances only while the executive floor is being shown.
 export class SecretaryRoutine {
-  constructor(navigator,{random=Math.random,onService=()=>{}}={}){
-    this.navigator=navigator;this.random=random;this.onService=onService;
+  constructor(navigator,{onService=()=>{}}={}){
+    this.navigator=navigator;this.onService=onService;
     this.stops=Object.fromEntries(Object.entries(SECRETARY_STOPS).map(([key,stop])=>[key,{...stop,...navigator.point(navigator.nearest(stop,stop.room))}]));
     this.walker=new OfficeWalker(navigator,this.stops.home);
-    this.steps=[];this.index=0;this.stepTime=0;this.idleTime=5;
-    this.job=null;this.jobIndex=0;this.greeting=null;this.pendingGreeting=null;this.ownerState=null;
+    this.steps=[];this.index=0;this.stepTime=0;this.paused=false;
+    this.job=null;this.greeting=null;this.pendingGreeting=null;this.ownerState=null;
     this.servedGuests=new Set();this.visitorCooldown=0;this.delivered=false;
   }
   resetHome(position=null){
-    this.steps=[];this.index=0;this.stepTime=0;this.job=null;this.greeting=null;this.pendingGreeting=null;this.ownerState=null;this.delivered=false;
-    this.walker=new OfficeWalker(this.navigator,position||this.stops.home);this.idleTime=8;
+    this.steps=[];this.index=0;this.stepTime=0;this.job=null;this.greeting=null;this.pendingGreeting=null;this.ownerState=null;this.delivered=false;this.paused=false;
+    this.walker=new OfficeWalker(this.navigator,position||this.stops.home);
     if(position){this.steps=[walk('home','비서 데스크로 돌아가 업무를 정리하는 중')];this.enterStep();}
   }
   get step(){return this.steps[this.index]||null;}
-  get text(){return this.greeting?.text||this.step?.text||'일정과 방문객을 확인하는 중';}
-  get prop(){return this.step?.prop||'clipboard';}
-  get working(){return Boolean(this.step&&this.step.action!=='walk');}
-  get facing(){return this.stops[this.step?.stop||'home'].face;}
+  get text(){return (!this.paused&&(this.greeting?.text||this.step?.text))||'일정과 방문객을 확인하는 중';}
+  get prop(){return this.paused?'clipboard':this.step?.prop||'clipboard';}
+  get working(){return !this.paused&&Boolean(this.step&&this.step.action!=='walk');}
+  get walking(){return Boolean(!this.paused&&!this.greeting&&this.step?.action==='walk'&&this.walker.walking);}
+  get facing(){return this.stops[this.paused?'home':this.step?.stop||'home'].face;}
   greet(text){this.greeting={text,elapsed:0,duration:3.4};}
   start(job){
     this.job=job;this.delivered=false;
@@ -56,16 +57,20 @@ export class SecretaryRoutine {
   }
   next(){
     this.index++;
-    if(!this.step){this.steps=[];this.job=null;this.idleTime=18+this.random()*14;}
+    if(!this.step){this.steps=[];this.job=null;}
     else this.enterStep();
   }
   cancelService(){
     const prop=this.prop;
     this.job='return';
-    this.steps=[walk('pantry','준비한 다과를 티룸으로 가져가는 중',prop.includes('Tray')?prop:'clipboard'),work('pantry','다음 차 준비를 위해 정리하는 중','tidy',3,'emptyTray'),walk('home','비서 데스크로 돌아가는 중')];
+    this.steps=[walk('pantry','준비한 다과를 비서실 준비대로 가져가는 중',prop.includes('Tray')?prop:'clipboard'),work('pantry','다음 차 준비를 위해 정리하는 중','tidy',3,'emptyTray'),walk('home','비서 데스크로 돌아가는 중')];
     this.index=0;this.enterStep();
   }
   tick(dt,{ceoPresent=false,ceoReady=false,ceoPhase='idle',ceoRoom=null,guests=[]}={}){
+    // Private visits never trigger a greeting, an escort, or a service action.
+    // Keep any existing duty suspended without replanning in response to the CEO.
+    this.paused=ceoPresent&&['server','research'].includes(ceoRoom);
+    if(this.paused){this.greeting=null;this.pendingGreeting=null;this.ownerState=ceoPhase;return;}
     const ownerState=ceoPresent?ceoPhase:'away';
     const sameRoom=Boolean(ceoPresent&&ceoRoom&&this.walker.room===ceoRoom);
     if(ownerState!==this.ownerState){
@@ -82,14 +87,10 @@ export class SecretaryRoutine {
     if(!this.delivered&&(this.job==='tea'&&(!ceoPresent||['to-lift','opening-origin','boarding','closing-origin','riding'].includes(ceoPhase))||this.job==='snacks'&&!guests.length))this.cancelService();
     if(this.greeting){this.greeting.elapsed+=dt;if(this.greeting.elapsed<this.greeting.duration)return;this.greeting=null;}
     if(!this.step){
-      this.idleTime-=dt;
       const visitors=this.visitorCooldown===0&&guests.some(id=>!this.servedGuests.has(id));
       if(visitors){this.start('snacks');return;}
-      if(this.idleTime>0)return;
-      const jobs=['tea','tidy-office','tidy-desk','tidy-reception'];
-      let job=jobs[this.jobIndex++%jobs.length];
-      if(job==='tea'&&!ceoReady)job='tidy-office';
-      this.start(job);return;
+      // Stay at the desk until guests arrive or a duty is explicitly started.
+      return;
     }
     if(this.step.action==='walk'){
       this.walker.tick(dt,1.28);

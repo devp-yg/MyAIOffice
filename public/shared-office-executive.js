@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three/three.module.js';
 import {buildExecutiveSuite} from './office-executive-scene.js';
-import {EXECUTIVE_ROOM_LAYOUT} from './office-executive.js';
+import {EXECUTIVE_ROOM_LAYOUT,isInsideExecutiveSuite} from './office-executive.js';
 import {createCharacter,disposeCharacter,secretaryLookForDate} from './office-scene.js';
 import {OfficeNavigator,OfficeWalker,roomAt} from './office-navigation.js';
 import {SecretaryRoutine} from './office-secretary.js';
@@ -79,7 +79,7 @@ export class SharedExecutiveWing {
     this.updateOwner(dt,time,motion,actors);
     const routine=this.routine,model=this.secretary;
     this.root.updateMatrixWorld(true);const ownerLocal=this.root.worldToLocal(this.owner.root.position.clone());
-    const ceoInsideOffice=roomAt(ownerLocal,EXECUTIVE_ROOM_LAYOUT)==='desk',ceoReady=ceoInsideOffice&&!this.ownerWalker?.walking;
+    const ceoRoom=roomAt(ownerLocal,EXECUTIVE_ROOM_LAYOUT),ceoInsideOffice=isInsideExecutiveSuite(ownerLocal),ceoReady=ceoRoom==='desk'&&!this.ownerWalker?.walking;
     if(!ceoInsideOffice){
       if(!this.assisting){const start=this.secretary.root.getWorldPosition(new THREE.Vector3());this.companionWalker=new OfficeWalker(this.sharedNavigator,{x:start.x,z:start.z});this.companion.root.position.copy(start);this.assisting=true;this.companionTargetIndex=null;routine.resetHome();this.secretary.root.visible=false;this.companion.root.visible=true;}
       const walker=this.companionWalker,leader=this.ownerWalker.position,ceoWalking=this.ownerWalker.walking,heading=ceoWalking?this.ownerWalker.heading:this.owner.root.rotation.y;
@@ -99,18 +99,18 @@ export class SharedExecutiveWing {
       const text=walking?'CEO를 따라 이동하며 자료를 챙기는 중':'CEO의 업무 수행을 돕는 중';const action=this.secretaryLabel.querySelector('.study-agent-action');if(action.textContent!==text)action.textContent=text;this.secretaryLabel.setAttribute('aria-label',`${this.secretaryName} · 비서 · ${text}`);
     }else{
       if(this.assisting){const start=this.root.worldToLocal(this.companion.root.getWorldPosition(new THREE.Vector3()));this.assisting=false;routine.resetHome({x:start.x,z:start.z});this.companion.root.visible=false;this.secretary.root.visible=true;}
-      routine.tick(dt,{ceoPresent:true,ceoReady,ceoPhase:'idle',ceoRoom:'desk'});
+      routine.tick(dt,{ceoPresent:true,ceoReady,ceoPhase:'idle',ceoRoom});
     }
     if(this.assisting){const ownerAction=this.ownerLabel.querySelector('.study-agent-action');if(ownerAction.textContent!==this.patrol.text)ownerAction.textContent=this.patrol.text;this.ownerLabel.setAttribute('aria-label',`${this.ownerName} · ${this.ownerTitle} · ${this.patrol.text}`);return;}
-    const walking=routine.walker.walking&&!routine.greeting,carrying=routine.prop.endsWith('Tray'),cycle=routine.walker.distanceWalked*11;
+    const walking=routine.walking,carrying=routine.prop.endsWith('Tray'),dutyAction=routine.paused?null:routine.step?.action,cycle=routine.walker.distanceWalked*11;
     model.root.position.set(routine.walker.position.x,0,routine.walker.position.z);
     const face=routine.greeting?ownerLocal:routine.facing,heading=walking?routine.walker.heading:Math.atan2(face.x-model.root.position.x,face.z-model.root.position.z);
     const delta=Math.atan2(Math.sin(heading-model.root.rotation.y),Math.cos(heading-model.root.rotation.y));model.root.rotation.y+=delta*Math.min(1,dt*8);
     model.body.position.y=motion?(walking?Math.abs(Math.sin(cycle))*.025:Math.sin(time*.002)*.008):0;
     model.legL.rotation.x=motion&&walking?Math.sin(cycle)*.4:0;model.legR.rotation.x=-model.legL.rotation.x;
     model.armL.rotation.x=carrying?-1.1:walking&&motion?-Math.sin(cycle)*.3:-.15;model.armR.rotation.x=carrying?-1.1:routine.prop==='clipboard'?-.35:walking&&motion?Math.sin(cycle)*.3:-.15;
-    model.head.rotation.x=routine.step?.action==='tidy'?.12:0;
-    if(motion&&routine.step?.action==='tidy')model.armR.rotation.x=-1.15+Math.sin(time*.005)*.12;
+    model.head.rotation.x=dutyAction==='tidy'?.12:0;
+    if(motion&&dutyAction==='tidy')model.armR.rotation.x=-1.15+Math.sin(time*.005)*.12;
     for(const [key,prop]of Object.entries(model.props))prop.visible=key===routine.prop;
     model.eyes.scale.y=motion&&time%5400>5250?.1:1;
     const action=this.secretaryLabel.querySelector('.study-agent-action');if(action.textContent!==routine.text)action.textContent=routine.text;

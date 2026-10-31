@@ -2,7 +2,7 @@ import * as THREE from './vendor/three/three.module.js';
 import { staffAppearance } from './staff-appearance.js';
 import { OfficeOwner } from './office-owner.js';
 import { buildExecutiveSuite as buildExecutiveInterior } from './office-executive-scene.js';
-import { SECRETARY_STATION, EXECUTIVE_INTERACTIONS } from './office-executive.js';
+import { SECRETARY_STATION, EXECUTIVE_INTERACTIONS, isInsideExecutiveSuite } from './office-executive.js';
 import { OfficeNavigator, OfficeWalker, roomAt, ROOM_LAYOUT, EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_WALLS, WALLS, DOORS, FURNITURE } from './office-navigation.js';
 import { SecretaryRoutine, SECRETARY_STOPS } from './office-secretary.js';
 import { daylightAt, sunriseSunset } from './solar-time.js';
@@ -272,8 +272,9 @@ export class OfficeScene {
   if(!this.secretaryRoutine)this.secretaryRoutine=new SecretaryRoutine(this.navigator,{onService:kind=>{this.secretaryServiceTimers[kind]=75;this.secretaryServings[kind].visible=true;}});
   const routine=this.secretaryRoutine;
   if(routine.navigator!==this.navigator||this.secretaryRoutineExecutive!==this.navigator.executive){routine.navigator=this.navigator;routine.stops=Object.fromEntries(Object.entries(SECRETARY_STOPS).map(([key,stop])=>[key,{...stop,...this.navigator.point(this.navigator.nearest(stop,stop.room))}]));routine.resetHome();this.secretaryEscortWalker=null;this.secretaryEscortTargetIndex=null;this.secretaryRoutineExecutive=this.navigator.executive;}
-  const ceoInsideOffice=this.navigator.executive&&roomAt(this.owner.walker.position,EXECUTIVE_ROOM_LAYOUT)==='desk';
-  const ceoReady=ceoInsideOffice&&['idle','commanding'].includes(j.phase)&&!this.owner.walker.walking;
+  const ceoInsideOffice=this.navigator.executive&&isInsideExecutiveSuite(this.owner.walker.position);
+  const ceoRoom=this.navigator.executive?roomAt(this.owner.walker.position,EXECUTIVE_ROOM_LAYOUT):null;
+  const ceoReady=ceoRoom==='desk'&&['idle','commanding'].includes(j.phase)&&!this.owner.walker.walking;
   if(!ceoInsideOffice){
    if(!this.secretaryEscorting){this.secretaryEscortStart={x:model.root.position.x,z:model.root.position.z};routine.resetHome();this.secretaryEscorting=true;}
    if(!this.secretaryEscortWalker||this.secretaryEscortContext!==this.context||this.secretaryEscortWalker.navigator!==this.navigator){
@@ -304,8 +305,8 @@ export class OfficeScene {
   if(this.secretaryEscorting){routine.resetHome({x:model.root.position.x,z:model.root.position.z});this.secretaryEscorting=false;this.secretaryEscortWalker=null;this.secretaryEscortTargetIndex=null;}
   const ceoPresent=true;
   const guests=[...this.actors.values()].filter(actor=>!actor.leaving&&actor.session.projectKey===this.context&&actor.desired.room==='reception'&&actor.walker.room==='reception'&&!actor.walker.walking).map(actor=>actor.session.id);
-  routine.tick(dt,{ceoPresent,ceoReady,ceoPhase:j.phase,ceoRoom:this.owner.walker.room,guests});
-  const walking=routine.walker.walking&&!routine.greeting&&routine.step?.action==='walk',carrying=routine.prop.endsWith('Tray'),action=routine.step?.action,cycle=routine.walker.distanceWalked*11;
+  routine.tick(dt,{ceoPresent,ceoReady,ceoPhase:j.phase,ceoRoom,guests});
+  const walking=routine.walking,carrying=routine.prop.endsWith('Tray'),action=routine.paused?null:routine.step?.action,cycle=routine.walker.distanceWalked*11;
   model.root.position.set(routine.walker.position.x,0,routine.walker.position.z);
   const face=routine.greeting?this.owner.model.root.position:routine.facing;
   const heading=walking?routine.walker.heading:Math.atan2(face.x-model.root.position.x,face.z-model.root.position.z),delta=Math.atan2(Math.sin(heading-model.root.rotation.y),Math.cos(heading-model.root.rotation.y));model.root.rotation.y+=delta*Math.min(1,dt*8);
@@ -584,7 +585,7 @@ export class OfficeScene {
   if(!signature)return;const points=[actor.walker.position,...actor.walker.route].map(p=>new THREE.Vector3(p.x,.065,p.z));const geometry=new THREE.BufferGeometry().setFromPoints(points);const line=new THREE.Line(geometry,new THREE.LineDashedMaterial({color:0xb08a4d,dashSize:.20,gapSize:.15,transparent:true,opacity:.85,depthTest:true}));line.computeLineDistances();line.renderOrder=5;this.world.add(line);this.routeLine=line;
  }
  frame(time){this.frameHandle=requestAnimationFrame(this.frame);const dt=Math.min((time-this.lastTime)/1000,.05);this.lastTime=time;if(document.hidden)return;const date=new Date(),minute=date.getHours()*60+date.getMinutes();if(minute!==this.lightingMinute){this.lightingMinute=minute;if(this.location)this.solarEvents=sunriseSunset(date,this.location.latitude,this.location.longitude);const daylight=daylightAt(date,this.solarEvents||{sunrise:390,sunset:1140});this.sky.intensity=.9+daylight;this.sun.intensity=.45+1.65*daylight;this.scene.background.copy(NIGHT_BACKGROUND).lerp(DAY_BACKGROUND,daylight);}for(const actor of [...this.actors.values()])this.updateActor(actor,dt,time);if(this.archiveMode)this.updateArchiveLibrarian(dt,time);this.owner.update(dt,time);this.updateSecretary(dt,time);for(const light of this.lights){const active=[...this.actors.values()].some(actor=>actor.session.projectKey===this.context&&actor.session.active&&!actor.walker.walking&&actor.desired.room===light.room);light.mesh.material.emissiveIntensity=active?.4+Math.max(0,Math.sin(time*.009+light.offset))*1.6:.15;}
-  const pair={context:this.context,insideOffice:Boolean(this.owner.model.root.visible&&this.navigator.executive&&roomAt(this.owner.walker.position,EXECUTIVE_ROOM_LAYOUT)==='desk'),active:Boolean(this.secretaryEscorting&&this.owner.model.root.visible&&this.secretaryModel.root.visible&&!this.archiveMode&&this.owner.journey.phase!=='riding'),owner:this.owner.walker.position,secretary:this.secretaryEscortWalker?.position||this.secretaryModel.root.position,heading:this.owner.walker.walking?this.owner.walker.heading:this.owner.model.root.rotation.y,ownerWalking:this.owner.walker.walking,secretaryHeading:this.secretaryEscortWalker?.heading,ownerFacing:this.owner.model.root.rotation.y,secretaryFacing:this.secretaryModel.root.rotation.y,walking:this.owner.walker.walking||Boolean(this.secretaryEscortWalker?.walking)};
+  const pair={context:this.context,insideOffice:Boolean(this.owner.model.root.visible&&this.navigator.executive&&isInsideExecutiveSuite(this.owner.walker.position)),active:Boolean(this.secretaryEscorting&&this.owner.model.root.visible&&this.secretaryModel.root.visible&&!this.archiveMode&&this.owner.journey.phase!=='riding'),owner:this.owner.walker.position,secretary:this.secretaryEscortWalker?.position||this.secretaryModel.root.position,heading:this.owner.walker.walking?this.owner.walker.heading:this.owner.model.root.rotation.y,ownerWalking:this.owner.walker.walking,secretaryHeading:this.secretaryEscortWalker?.heading,ownerFacing:this.owner.model.root.rotation.y,secretaryFacing:this.secretaryModel.root.rotation.y,walking:this.owner.walker.walking||Boolean(this.secretaryEscortWalker?.walking)};
   this.visitor.update(this.navigator,dt,time,this.motion,!this.archiveMode,pair);this.updateLabels();this.updateRoute();this.renderer.render(this.scene,this.camera);
   const signature=[...this.actors.keys()].map(id=>{const state=this.getStatus(id);return `${id}:${state.phase}:${state.room}:${state.target}`;}).join('|');if(signature!==this.statusSignature){this.statusSignature=signature;this.onStatusChange?.();}
  }

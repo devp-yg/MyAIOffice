@@ -1,6 +1,8 @@
 // One architectural model is used by both the renderer and the route planner.
 // West is the visitor entrance; the entire private wing is reached through the CEO office.
 export const EXECUTIVE_BOUNDS = { minX:-14.8, maxX:7.8, minZ:-7, maxZ:7 };
+// Include every room and the private gallery, but exclude the elevator lobby.
+export function isInsideExecutiveSuite({x,z}){return x>=-12&&x<=EXECUTIVE_BOUNDS.maxX&&z>=EXECUTIVE_BOUNDS.minZ&&z<=EXECUTIVE_BOUNDS.maxZ;}
 export const EXECUTIVE_ROOM_LAYOUT = [
   {key:'studio',x:-8.9,z:-.1,bounds:[-12,-5.8,-1.8,1.6],color:'#e8e4da',label:[-9.0,1.8,.85]},
   {key:'reception',x:-8.9,z:-4.4,bounds:[-12,-5.8,-7,-1.8],color:'#e4d7c5',label:[-9.25,1.8,-5.8]},
