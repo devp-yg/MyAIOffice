@@ -489,18 +489,18 @@ export class OfficeScene {
     actor.walker.setDestination(point,room);
    }
   }
-  const walker=actor.walker;const receiving=this.isReceiving(actor);if(!receiving)walker.tick(dt,1.7);const model=actor.model;model.root.visible=actor.session.projectKey===this.context;actor.label.hidden=!model.root.visible;model.root.position.set(walker.position.x,0,walker.position.z);
+  const walker=actor.walker;const receiving=this.isReceiving(actor),hurrying=actor.session.active&&!actor.leaving;if(!receiving)walker.tick(dt,hurrying?4.4:1.7);const model=actor.model;model.root.visible=actor.session.projectKey===this.context;actor.label.hidden=!model.root.visible;model.root.position.set(walker.position.x,0,walker.position.z);
   const working=actor.session.active&&!walker.walking;const room=actor.desired?.room||'desk';const heading=walker.walking?walker.heading:working?(room==='studio'?(actor.desired.slot===2?Math.PI/2:-Math.PI/2):room==='server'?(this.navigator.executive?(actor.interaction==='terminal'?0:Math.PI/2):(actor.interaction==='terminal'?Math.PI/2:Math.PI)):room==='meeting'?(actor.interaction==='board'?(this.navigator.executive?Math.PI/2:Math.PI):0):room==='research'?(actor.interaction==='search'?Math.PI/4:0):room==='library'?Math.PI/2:Math.PI):.30;let delta=heading-model.root.rotation.y;delta=Math.atan2(Math.sin(delta),Math.cos(delta));model.root.rotation.y+=delta*Math.min(1,dt*10);
-  const walking=walker.walking&&!receiving,cycle=walker.distanceWalked*12;
-  model.body.position.y=this.motion?(walking?Math.abs(Math.sin(cycle))*.045:Math.sin(time*.002)*.012):0;
-  model.legL.rotation.x=this.motion&&walking?Math.sin(cycle)*.5:0;model.legR.rotation.x=-model.legL.rotation.x;
-  model.armL.rotation.x=this.motion&&walking?-Math.sin(cycle)*.5:-.20;model.armR.rotation.x=this.motion&&walking?Math.sin(cycle)*.5:-.20;
+  const walking=walker.walking&&!receiving,running=walking&&hurrying,cycle=walker.distanceWalked*(running?8:12);
+  model.body.position.y=this.motion?(walking?Math.abs(Math.sin(cycle))*(running?.09:.045):Math.sin(time*.002)*.012):0;
+  model.legL.rotation.x=this.motion&&walking?Math.sin(cycle)*(running?.85:.5):0;model.legR.rotation.x=-model.legL.rotation.x;
+  model.armL.rotation.x=this.motion&&walking?-Math.sin(cycle)*(running?.75:.5):-.20;model.armR.rotation.x=this.motion&&walking?Math.sin(cycle)*(running?.75:.5):-.20;
   const blink=this.motion&&time%5400>5210;model.eyes.scale.y=blink?.10:1;
   const phase=this.getStatus(actor.session.id).phase;
   const idle=actor.session.identity?.idle||'relax';
   const pose=receiving?'phone':walking||phase==='waiting'||phase==='blocked'?'none':!actor.session.active||actor.leaving?({game:'game',read:'book',relax:'cup'}[idle]||'none'):room==='server'?(actor.interaction==='terminal'?'laptop':'tool'):room==='meeting'?(actor.interaction==='board'?'marker':'clipboard'):room==='research'?(actor.interaction==='search'?'magnifier':'laptop'):({library:'book',studio:'laptop',desk:'clipboard'}[room]||'laptop');
   if(pose!==actor.lastPose){for(const [key,prop]of Object.entries(model.props))prop.visible=key===pose;actor.lastPose=pose;}
-  model.body.rotation.set(0,0,0);model.body.position.x=0;model.head.rotation.y=0;
+  model.body.rotation.set(this.motion&&running?.16:0,0,0);model.body.position.x=0;model.head.rotation.y=0;
   if(phase==='resting'){if(idle==='lie'){model.body.rotation.z=-Math.PI/2;model.body.position.y=.38;model.body.position.x=-.3;}if(idle==='nap'){model.body.rotation.x=.32;model.head.rotation.x=.18;model.eyes.scale.y=.08;}else model.head.rotation.x=0;if(idle==='stretch'){model.armL.rotation.z=-2.6;model.armR.rotation.z=2.6;}else{model.armL.rotation.z=0;model.armR.rotation.z=0;}if(idle==='game'&&this.motion){model.armL.rotation.x=-.75+Math.sin(time*.015)*.06;model.armR.rotation.x=-.75-Math.sin(time*.015)*.06;}}else{model.head.rotation.x=0;model.armL.rotation.z=0;model.armR.rotation.z=0;}
   const seated=this.motion&&!this.navigator.executive&&phase==='working'&&(room==='studio'||room==='research'&&actor.desired.slot<2||room==='meeting'&&actor.interaction!=='board');
   if(seated){model.body.position.y=.29+Math.sin(time*.006)*.012;model.legL.rotation.x=-1.12;model.legR.rotation.x=-1.12;}
@@ -523,7 +523,7 @@ export class OfficeScene {
   const status=this.getStatus(actor.session.id);actor.label.dataset.state=status.phase;actor.label.dataset.room=status.room||'corridor';actor.label.dataset.target=status.target;actor.label.dataset.worldX=walker.position.x.toFixed(3);actor.label.dataset.worldZ=walker.position.z.toFixed(3);
   const idleNames={game:'게임하며 쉬는 중',nap:'꾸벅꾸벅 조는 중',lie:'누워서 쉬는 중',stretch:'쭉 기지개 켜는 중',read:'책 읽으며 쉬는 중',relax:'커피 마시며 쉬는 중'};
   const activeRoomNames=this.navigator.executive?EXECUTIVE_ROOM_NAMES:ROOM_NAMES;
-  const text=status.phase==='receiving'?'☎ CEO의 원격 지시를 받는 중':status.phase==='walking'?`${activeRoomNames[status.target]||ROOM_NAMES[status.target]||'공간'}로 이동 중`:status.phase==='blocked'?'이동 경로 확인 중':status.phase==='waiting'?'업무 시작 준비 중':status.phase==='working'?(WORK_ACTION_NAMES[room]?.[actor.interaction]||TASK_NAMES[room]):idleNames[idle];
+  const text=status.phase==='receiving'?'☎ CEO의 원격 지시를 받는 중':status.phase==='walking'?`${activeRoomNames[status.target]||ROOM_NAMES[status.target]||'공간'}로 ${running?'뛰어가는':'걸어가는'} 중`:status.phase==='blocked'?'이동 경로 확인 중':status.phase==='waiting'?'업무 시작 준비 중':status.phase==='working'?(WORK_ACTION_NAMES[room]?.[actor.interaction]||TASK_NAMES[room]):idleNames[idle];
   const rank=actor.session.hasParent?'서브에이전트':'메인 세션';
   const labelKey=`${actor.session.displayName}-${rank}-${text}`;if(actor.labelKey!==labelKey){actor.label.replaceChildren();const name=document.createElement('strong');const nameText=document.createElement('span');nameText.textContent=actor.session.displayName||'Codex';const rankTag=document.createElement('small');rankTag.className='agent-rank';rankTag.textContent=rank;name.append(nameText,rankTag);const action=document.createElement('span');action.textContent=text;actor.label.append(name,action);actor.label.setAttribute('aria-label',`${nameText.textContent} · ${rank} · ${text}`);actor.labelKey=labelKey;}
   actor.label.classList.toggle('walking',walking);actor.label.classList.toggle('receiving',receiving);actor.label.classList.toggle('selected',actor.session.id===this.selectedId);

@@ -300,16 +300,18 @@ export class SharedOfficeScene {
   clearRoute(){if(this.routeLine){this.routeLine.removeFromParent();this.routeLine.geometry.dispose();this.routeLine.material.dispose();this.routeLine=null;}}
   stopWalk(){this.walkActor=null;this.walkReturning=false;this.clearRoute();this.onWalkEnd?.();}
   updateActor(actor,dt,time){
-    actor.walker.tick(dt,1.9);const {model,walker,seat}=actor,walking=walker.walking;
+    const hurrying=actor.session?.active&&!actor.departing&&this.walkActor!==actor&&(actor.commandUntil||0)<=time;
+    actor.walker.tick(dt,hurrying?4.4:1.9);const {model,walker,seat}=actor,walking=walker.walking,running=walking&&hurrying;
     if(actor.departing&&!walking){this.removeActor(actor);actor.departed=true;if(this.selectedId===actor.id)this.selectedId=null;return;}
     const point=walking?walker.position:restingPoint(seat);
     model.root.position.set(point.x,!walking&&seat.room==='desk'?SOFA_LIFT:0,point.z);actor.marker.position.set(point.x,.038,point.z);
     const heading=walking?walker.heading:seat.heading,difference=Math.atan2(Math.sin(heading-model.root.rotation.y),Math.cos(heading-model.root.rotation.y));model.root.rotation.y+=difference*Math.min(1,dt*10);
-    const cycle=walker.distanceWalked*12,beat=time*.009+actor.index;
-    model.body.position.y=this.motion?(walking?Math.abs(Math.sin(cycle))*.04:Math.sin(time*.002+actor.index)*.008):0;
+    const cycle=walker.distanceWalked*(running?8:12),beat=time*.009+actor.index;
+    model.body.position.y=this.motion?(walking?Math.abs(Math.sin(cycle))*(running?.09:.04):Math.sin(time*.002+actor.index)*.008):0;
+    model.body.rotation.x=this.motion&&running?.16:0;
     const seated=!walking&&seat.room!=='library';if(seated)model.body.position.y+=.29;
-    model.legL.rotation.x=walking?(this.motion?Math.sin(cycle)*.5:0):seated?-1.05:0;model.legR.rotation.x=walking?-model.legL.rotation.x:model.legL.rotation.x;
-    model.armL.rotation.x=walking?(this.motion?-Math.sin(cycle)*.4:0):seat.room==='studio'||seat.room==='server'?-1.1+(this.motion?Math.sin(beat)*.08:0):-.55;
+    model.legL.rotation.x=walking?(this.motion?Math.sin(cycle)*(running?.85:.5):0):seated?-1.05:0;model.legR.rotation.x=walking?-model.legL.rotation.x:model.legL.rotation.x;
+    model.armL.rotation.x=walking?(this.motion?-Math.sin(cycle)*(running?.75:.4):0):seat.room==='studio'||seat.room==='server'?-1.1+(this.motion?Math.sin(beat)*.08:0):-.55;
     model.armR.rotation.x=walking?-model.armL.rotation.x:seat.room==='studio'||seat.room==='server'?-1.15+(this.motion?Math.cos(beat)*.09:0):-.7;
     model.eyes.scale.y=this.motion&&(time+actor.index*230)%5400>5250?.1:1;
     const resting=actor.session&&!actor.session.active,idle=actor.session?.identity?.idle;
