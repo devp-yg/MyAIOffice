@@ -5,6 +5,28 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT_KEY = 'registry_initialized';
 
+export function readCodexIndex(directory) {
+  let db;
+  const workspaces = new Map(), projects = [];
+  try {
+    db = new DatabaseSync(path.join(directory, 'state_5.sqlite'), { readOnly: true, timeout: 50 });
+    for (const {id, cwd} of db.prepare("SELECT id, cwd FROM threads WHERE archived = 0").all()) {
+      if (typeof cwd === 'string' && path.isAbsolute(cwd)) workspaces.set(id, cwd);
+    }
+    projects.push(...db.prepare(`
+      SELECT projects.name, projects.created_at_ms AS createdAt, project_roots.path AS cwd,
+             COUNT(*) OVER (PARTITION BY projects.id) AS rootCount
+      FROM projects JOIN project_roots ON project_roots.project_id = projects.id
+      ORDER BY rootCount DESC, projects.created_at_ms
+    `).all());
+  } catch {
+    // Older installations may have rollouts and desktop settings without these tables.
+  } finally {
+    db?.close();
+  }
+  return {workspaces, projects};
+}
+
 export async function openOfficeDatabase() {
   const filename = fileURLToPath(new URL('./data/office.sqlite', import.meta.url));
   const directory = path.dirname(filename);

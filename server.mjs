@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { summarizeLine, projectInfo, sessionSummary, digest } from './server-records.mjs';
-import { openOfficeDatabase, validateRegistries } from './server-database.mjs';
+import { openOfficeDatabase, readCodexIndex, validateRegistries } from './server-database.mjs';
 import { createSettingsStore } from './server-settings.mjs';
 import { StaffIdentities } from './public/staff-identities.js';
 
@@ -62,20 +62,38 @@ async function refreshSnapshot(){
     await Promise.all(recent.map(async file=>{const cached=sessionCache.get(file.full);if(cached?.mtime===file.mtime&&cached.size===file.size)return;const session=await readSession(file,cached?.session);if(session)sessionCache.set(file.full,{session,mtime:file.mtime,size:file.size});}));
     const missing=files.filter(file=>!metadataCache.has(file.full));
     for(let offset=0;offset<missing.length;offset+=24)await Promise.all(missing.slice(offset,offset+24).map(async file=>{try{metadataCache.set(file.full,await readHeader(file));}catch{}}));
+    const index=readCodexIndex(process.env.CODEX_SQLITE_HOME||codexHome);
+    const projectByFile=new Map();
     const projects=new Map();
-    for(const file of files){const meta=metadataCache.get(file.full);if(!meta)continue;const info=projectInfo(meta.cwd);if(!projects.has(info.key))projects.set(info.key,{...info,cwd:meta.cwd,count:0,lastActivityAt:0});const project=projects.get(info.key);project.count++;project.lastActivityAt=Math.max(project.lastActivityAt,file.mtime);}
-    for(const saved of await savedProjects()){if(projects.has(saved.key)){const project=projects.get(saved.key);project.name=saved.name;project.createdAt=saved.createdAt;}else projects.set(saved.key,saved);}
+    for(const file of files){
+      const meta=metadataCache.get(file.full);if(!meta)continue;
+      // The rollout header records the original folder, even after a chat moves.
+      const cwd=index.workspaces.get(meta.id)||meta.cwd,info=projectInfo(cwd);
+      projectByFile.set(file.full,info.key);
+      if(!projects.has(info.key))projects.set(info.key,{...info,cwd,count:0,lastActivityAt:0});
+      const project=projects.get(info.key);project.count++;project.lastActivityAt=Math.max(project.lastActivityAt,file.mtime);
+    }
+    const registrations=new Map((await savedProjects()).map(project=>[project.key,project]));
+    for(const {cwd,name,createdAt,rootCount} of index.projects){
+      if(!path.isAbsolute(cwd))continue;
+      const info=projectInfo(cwd);
+      registrations.set(info.key,{...info,cwd,name:rootCount===1?name:info.name,count:0,lastActivityAt:0,createdAt});
+    }
+    for(const saved of registrations.values()){if(projects.has(saved.key)){const project=projects.get(saved.key);project.name=saved.name;project.createdAt=saved.createdAt;}else projects.set(saved.key,saved);}
     const existing=await Promise.all([...projects.values()].map(async project=>({...project,exists:await projectExists(project.cwd)})));
     const projectKeys=new Set(existing.filter(project=>project.exists).map(project=>project.key));
-    const sessions=recent.map(file=>sessionCache.get(file.full)?.session).filter(session=>session&&projectKeys.has(session.projectKey)).map(session=>({...session,active:!session.finished&&Date.now()-session.updatedAt<120000}));
+    const sessions=recent.flatMap(file=>{
+      const session=sessionCache.get(file.full)?.session,projectKey=projectByFile.get(file.full);
+      if(!session||!projectKeys.has(projectKey))return [];
+      return [{...session,projectKey,project:projects.get(projectKey).name,active:!session.finished&&Date.now()-session.updatedAt<120000}];
+    });
     const manifest=existing.filter(project=>project.exists).map(({cwd,exists,...project})=>({...project,active:sessions.filter(session=>session.projectKey===project.key&&session.active).length,lastRequestAt:Math.max(0,...sessions.filter(session=>session.projectKey===project.key).map(session=>session.lastRequestAt||0))}));
-    const projectNames=new Map(manifest.map(project=>[project.key,project.name]));
     const archives=files.map(file=>{
-      const meta=metadataCache.get(file.full);if(!meta)return null;
-      const project=projectInfo(meta.cwd);if(!projectKeys.has(project.key))return null;
+      const projectKey=projectByFile.get(file.full);if(!projectKeys.has(projectKey))return null;
+      const meta=metadataCache.get(file.full);
       const recentSession=sessionCache.get(file.full)?.session;
       if(recentSession&&!recentSession.finished&&Date.now()-recentSession.updatedAt<120000)return null;
-      return {id:digest(meta.id||file.full),projectKey:project.key,project:projectNames.get(project.key)||project.name,hasParent:Boolean(meta.parentId),updatedAt:file.mtime};
+      return {id:digest(meta.id||file.full),projectKey,project:projects.get(projectKey).name,hasParent:Boolean(meta.parentId),updatedAt:file.mtime};
     }).filter(Boolean);
     const registry=officeDatabase.readRegistries();let staff;
     if(registry.initialized){

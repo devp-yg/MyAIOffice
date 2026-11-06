@@ -8,10 +8,10 @@ import {StaffIdentities} from '../public/staff-identities.js';
 const session=(id,room='studio',key='project-a',active=true)=>({id,room,projectKey:key,project:key,active,updatedAt:1000});
 const projects=sessions=>sharedProjects({sessions});
 
-test('all active projects share process zones; all idle workers are optional',()=>{
+test('active workers and the latest resting worker per project attend the office',()=>{
   const sessions=[session('a'),session('b','research','project-b'),session('c','elevator','project-c'),{...session('old','desk','project-a',false),updatedAt:500},session('latest','desk','project-a',false)];
   assert.equal(sharedRoom(sessions[1]),'library');assert.equal(sharedRoom(sessions[2]),'meeting');
-  assert.deepEqual(displayedSessions(sessions).map(s=>s.id),['a','b','c','latest','old']);
+  assert.deepEqual(displayedSessions(sessions).map(s=>s.id),['a','b','c','latest']);
   assert.equal(displayedSessions(sessions,false).length,3);
 });
 
