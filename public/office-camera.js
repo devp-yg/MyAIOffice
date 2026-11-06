@@ -5,6 +5,10 @@ export function beginCameraOrbit(view){
   // A symmetric frame already orbits around viewTarget, including elevated targets.
   if(view.orbitFrame)return;
   const {camera,viewTarget,zoom}=view;
+  if(camera.isPerspectiveCamera){
+    view.orbitFrame={distance:camera.position.distanceTo(viewTarget)*zoom};
+    return;
+  }
   const ray=new THREE.Raycaster();
   ray.setFromCamera(new THREE.Vector2(0,0),camera);
   const pivot=new THREE.Vector3();
@@ -24,4 +28,17 @@ export function characterFocusPoint(model,target=new THREE.Vector3()){
 
 export function orbitHalfHeight(view,aspect){
   return Math.max(view.orbitFrame.halfHeight,view.orbitFrame.halfWidth/aspect)/view.zoom;
+}
+
+export function panCamera(view,start,dx,dy){
+  const {camera,viewTarget,width}=view;
+  const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);
+  const up=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
+  let span;
+  if(camera.isPerspectiveCamera){
+    span=2*camera.position.distanceTo(viewTarget)/camera.projectionMatrix.elements[0];
+    const slope=Math.max(.35,Math.hypot(up.x,up.z));
+    up.set(right.z,0,-right.x).divideScalar(slope);
+  }else span=camera.right-camera.left;
+  viewTarget.copy(start).addScaledVector(right,-dx*span/width).addScaledVector(up,dy*span/width);
 }

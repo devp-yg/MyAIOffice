@@ -1,11 +1,15 @@
 import * as THREE from './vendor/three/three.module.js';
-import {beginCameraOrbit,characterFocusPoint,orbitHalfHeight} from './office-camera.js';
+import {beginCameraOrbit,characterFocusPoint} from './office-camera.js';
 import {OfficeScene,createCharacter,disposeCharacter,furniture} from './office-scene.js';
 import {OfficeNavigator,OfficeWalker} from './office-navigation.js';
 import {SHARED_ROOMS,ROOM_CORNER_RADIUS,ZONE_BOUNDARY_STYLES,createSharedLayout,createPreviewAssignments} from './shared-office-layout.js';
 import {SharedExecutiveWing} from './shared-office-executive.js';
-import {daylightAt,sunriseSunset} from './solar-time.js';
-import {buildSharedGround} from './shared-office-ground.js';
+import {celestialAt} from './office-celestial.js';
+import {SharedOfficeSky} from './shared-office-sky.js';
+import {buildPerimeter} from './shared-office-perimeter.js';
+import {buildSharedParking} from './shared-office-parking.js';
+import {buildOfficeElevator} from './shared-office-elevator.js';
+import {buildOfficeTerrain,buildSharedGround,groundShapeGeometry,CITY_CAMERA_LIMIT,GROUND_LEVEL,WORLD_DISTANCE} from './shared-office-ground.js';
 import {SharedOfficeLabels} from './shared-office-labels.js';
 import {OfficeVisitor} from './office-visitor.js';
 import {COURTYARD_CATS,CourtyardCat} from './shared-office-cat.js';
@@ -14,7 +18,10 @@ import {createCatHabitat} from './shared-office-cat-habitat.js';
 const materialCache=new Map();
 const CAT_ACTION_LABELS={loaf:'식빵 굽는 중',sniff:'킁킁',hiss:'하악!'};
 const MAP_CAMERA_LABEL='공용 오피스 3D 공간. 드래그로 이동, Shift + 드래그로 회전, 스크롤로 확대할 수 있습니다. 고양이나 말풍선을 선택하면 고양이 시점으로 전환합니다.';
-const DAY_BACKGROUND=new THREE.Color('#eef2ed'),NIGHT_BACKGROUND=new THREE.Color('#68747d');
+const PARKING_BACKGROUND=new THREE.Color('#2c3a44');
+const DAY_LIGHT=new THREE.Color('#fff4dc'),TWILIGHT_LIGHT=new THREE.Color('#ffc58c');
+const MAP_ELEVATION=21*Math.PI/180;
+const MIN_MAP_ZOOM=.8;
 const SEAT_BACKSET=.25,SOFA_BACKSET=.82,SOFA_LIFT=.32;
 function mat(color){if(!materialCache.has(color))materialCache.set(color,new THREE.MeshStandardMaterial({color,roughness:.9}));return materialCache.get(color);}
 const cube=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(1,16,12),cylinder=new THREE.CylinderGeometry(1,1,1,48);
@@ -24,7 +31,7 @@ function restingPoint(seat){const backset=seat.room==='desk'?SOFA_BACKSET:seat.r
 function roundedShape(x0,x1,z0,z1,r=1.5){
   const s=new THREE.Shape();s.moveTo(x0+r,z0);s.lineTo(x1-r,z0);s.quadraticCurveTo(x1,z0,x1,z0+r);s.lineTo(x1,z1-r);s.quadraticCurveTo(x1,z1,x1-r,z1);s.lineTo(x0+r,z1);s.quadraticCurveTo(x0,z1,x0,z1-r);s.lineTo(x0,z0+r);s.quadraticCurveTo(x0,z0,x0+r,z0);return s;
 }
-function tile(parent,shape,color,y){const geometry=new THREE.ShapeGeometry(shape,48);geometry.rotateX(Math.PI/2);const m=mesh(parent,geometry,color,0,y,0);m.material=new THREE.MeshStandardMaterial({color,side:THREE.DoubleSide,roughness:.95});m.castShadow=false;return m;}
+function tile(parent,shape,color,y){const geometry=groundShapeGeometry(shape,48);const m=mesh(parent,geometry,color,0,y,0);m.material=new THREE.MeshStandardMaterial({color,roughness:.95});m.castShadow=false;return m;}
 function zoneBoundary(parent,item,glassMaterial){
   const g=new THREE.Group();g.position.set(item.x,0,item.z);g.rotation.y=item.rotation;parent.add(g);
   const {w,h}=item,d=item.bodyDepth;
@@ -61,7 +68,7 @@ function zoneBoundary(parent,item,glassMaterial){
 }
 function batchStatic(root){
   root.updateMatrixWorld(true);const groups=new Map(),inverse=root.matrixWorld.clone().invert();
-  root.traverse(node=>{if(!node.isMesh||node.userData.room)return;const key=node.geometry.uuid+node.material.uuid;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(node);});
+  root.traverse(node=>{if(!node.isMesh||node.userData.room||node.userData.unbatched||node.material.transparent)return;const key=node.geometry.uuid+node.material.uuid;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(node);});
   for(const meshes of groups.values()){
     if(meshes.length<3)continue;
     const instanced=new THREE.InstancedMesh(meshes[0].geometry,meshes[0].material,meshes.length);instanced.castShadow=meshes.some(m=>m.castShadow);instanced.receiveShadow=true;
@@ -70,18 +77,18 @@ function batchStatic(root){
 }
 
 export class SharedOfficeScene {
-  constructor(element,{onRoom,onActor,onOwner,onOwnerStatus,onView,onCatView,onWalkEnd,preferences={}}={}){
+  constructor(element,{onRoom,onActor,onOwner,onOwnerStatus,onView,onCatView,onFloor,onWalkEnd,preferences={}}={}){
     this.element=element;this.onRoom=onRoom;this.onActor=onActor;this.onOwner=onOwner;this.onOwnerStatus=onOwnerStatus;this.onView=onView;this.onWalkEnd=onWalkEnd;
-    this.scene=new THREE.Scene();this.scene.background=DAY_BACKGROUND.clone();this.lightingMinute=-1;this.location=null;this.solarEvents=null;this.ambientFixtures=[];
-    this.world=new THREE.Group();this.scene.add(this.world);this.camera=new THREE.OrthographicCamera(-24,24,16,-16,.1,180);
-    this.catCamera=new THREE.PerspectiveCamera(65,1,.035,180);
-    this.catLookTarget=new THREE.Vector3();this.catView=null;this.onCatView=onCatView;
+    this.scene=new THREE.Scene();this.outdoorSky=new SharedOfficeSky(this.scene);this.lightingMinute=-1;this.location=null;this.ambientFixtures=[];
+    this.world=new THREE.Group();this.scene.add(this.world);this.camera=new THREE.PerspectiveCamera(57,1,1,WORLD_DISTANCE);
+    this.catCamera=new THREE.PerspectiveCamera(65,1,.09,WORLD_DISTANCE);
+    this.catLookTarget=new THREE.Vector3();this.catView=null;this.onCatView=onCatView;this.onFloor=onFloor;
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.shadowMap.autoUpdate=false;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
     const canvas=this.renderer.domElement;canvas.setAttribute('aria-label',MAP_CAMERA_LABEL);canvas.setAttribute('role','img');element.append(canvas);
     this.sky=new THREE.HemisphereLight(0xfff9ed,0xb0bc9f,1.9);this.scene.add(this.sky);
-    this.sun=new THREE.DirectionalLight(0xfff4dc,2.1);this.sun.position.set(-16,32,8);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);Object.assign(this.sun.shadow.camera,{left:-28,right:28,top:28,bottom:-28,near:1,far:80});this.sun.shadow.bias=-.0003;this.sun.shadow.normalBias=.03;this.sun.shadow.radius=4;this.scene.add(this.sun);
-    this.angle=.48;this.elevation=.72;this.zoom=1;this.viewTarget=new THREE.Vector3(0,0,0);this.motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;this.showLabels=true;this.project=null;this.selectedId=null;this.selectedOwner=false;this.selectedRoom=null;this.actors=[];this.lights=[];
+    this.sun=new THREE.DirectionalLight(0xfff4dc,2.1);this.sun.position.set(-16,32,8);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);Object.assign(this.sun.shadow.camera,{left:-28,right:28,top:28,bottom:-28,near:1,far:80});this.sun.shadow.bias=-.0003;this.sun.shadow.normalBias=.03;this.sun.shadow.radius=4;this.scene.add(this.sun,this.sun.target);
+    this.angle=.48;this.elevation=MAP_ELEVATION;this.zoom=1;this.viewTarget=new THREE.Vector3(0,0,0);this.motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;this.showLabels=true;this.project=null;this.selectedId=null;this.selectedOwner=false;this.selectedAmbient=null;this.selectedRoom=null;this.actors=[];this.lights=[];
     this.labelLayer=document.createElement('div');this.labelLayer.className='study-labels';element.append(this.labelLayer);this.roomLabels=new Map();
     this.cats=[];
     for(const room of SHARED_ROOMS){
@@ -92,11 +99,11 @@ export class SharedOfficeScene {
     this.executive=new SharedExecutiveWing(this.world,this.labelLayer,{batch:batchStatic,onSelect:()=>this.onRoom?.('executive'),onOwnerSelect:()=>this.onOwner?.(),onSecretarySelect:()=>this.selectAmbient('secretary'),preferences});
     this.executive.secretary.root.userData.ambientCharacter='secretary';this.executive.companion.root.userData.ambientCharacter='secretary';
     this.actorLabels=new SharedOfficeLabels(this.labelLayer);
-    this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),alwaysFull:true,selected:()=>this.selectedOwner});
-    this.actorLabels.add(this.executive.secretaryLabel,{model:()=>this.executive.assisting?this.executive.companion:this.executive.secretary,working:()=>true});
+    this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,name:()=>this.executive.ownerName,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),alwaysFull:true,selected:()=>this.selectedOwner});
+    this.actorLabels.add(this.executive.secretaryLabel,{model:()=>this.executive.assisting?this.executive.companion:this.executive.secretary,name:()=>this.executive.secretaryName,working:()=>true,selected:()=>this.selectedAmbient==='secretary'});
     this.visitor=new OfficeVisitor(this.world,this.labelLayer,createCharacter,{shared:true,preferences});
     this.visitor.model.root.userData.ambientCharacter='visitor';this.visitor.label.addEventListener('click',()=>this.selectAmbient('visitor'));
-    this.actorLabels.add(this.visitor.label,{model:()=>this.visitor.model,working:()=>false,alwaysFull:true});
+    this.actorLabels.add(this.visitor.label,{model:()=>this.visitor.model,name:()=>this.visitor.profile.name,working:()=>false,alwaysFull:true,selected:()=>this.selectedAmbient==='visitor'});
     // Use the existing office camera gestures and keyboard controls.
     canvas.addEventListener('pointerdown',()=>{this.transition=null;});
     OfficeScene.prototype.bindControls.call(this,()=>!this.catView);
@@ -105,21 +112,30 @@ export class SharedOfficeScene {
   }
   removeActor(actor){this.actorLabels.remove(actor.label);actor.model.root.removeFromParent();disposeCharacter(actor.model);actor.label.remove();actor.marker.geometry.dispose();actor.marker.material.dispose();actor.marker.removeFromParent();}
   clearCats(){
-    for(const {model,label} of this.cats){
+    for(const {model,label,actionLabel} of this.cats){
       model.dispose();
       label.remove();
+      actionLabel.remove();
     }
     this.cats=[];
   }
   rebuildLayout(layout){
     const followedCat=this.catView?.appearance;
+    const previous=this.layout?.bounds;
+    const keepOverview=!previous||(!this.orbitFrame&&this.zoom===1&&this.viewTarget.y===0&&
+      this.viewTarget.x===(previous.minX+previous.maxX)/2&&this.viewTarget.z===(previous.minZ+previous.maxZ)/2);
     this.clearCats();
     if(this.layoutGroup){
-      this.groundDesign?.dispose();this.layoutGroup.removeFromParent();for(const geometry of this.ownedGeometries||[])geometry.dispose();for(const material of this.ownedMaterials||[])material.dispose();
-      for(const light of this.lights)light.mesh.material.dispose();
+      this.disposeLayout();
     }
     this.lights=[];this.ambientFixtures=[];this.layout=layout;this.navigator=new OfficeNavigator(this.layout);
+    this.parking=buildSharedParking(layout.bounds,layout.elevator,batchStatic);
     this.layoutGroup=new THREE.Group();this.world.add(this.layoutGroup);this.buildSpace();
+    this.layoutGroup.add(this.parking.surfaceRamp);
+    this.parking.group.visible=Boolean(this.parkingView);
+    this.scene.add(this.parking.group);
+    if(this.parkingView)this.frameOverview();
+    else if(keepOverview)this.frameOverview();
     // Animated meshes must stay out of the layout group's static batch.
     const habitat=createCatHabitat(layout);
     this.cats=COURTYARD_CATS.map((appearance,index)=>{
@@ -127,13 +143,20 @@ export class SharedOfficeScene {
       model.root.userData.catIndex=index;
       const label=document.createElement('button');
       label.type='button';
-      label.className='study-cat-label';
+      label.className='study-nameplate study-cat-nameplate';
       label.textContent=appearance.name;
       label.title='고양이 시점으로 보기';
       label.setAttribute('aria-label',`${appearance.name} 시점으로 보기`);
       label.addEventListener('click',()=>this.selectCat(model));
-      this.labelLayer.append(label);
-      return {model,label,anchor:new THREE.Vector3()};
+      const actionLabel=document.createElement('button');
+      actionLabel.className='study-cat-label';
+      actionLabel.type='button';
+      actionLabel.tabIndex=-1;
+      actionLabel.hidden=true;
+      actionLabel.title=label.title;
+      actionLabel.addEventListener('click',()=>this.selectCat(model));
+      this.labelLayer.append(label,actionLabel);
+      return {model,label,actionLabel,anchor:new THREE.Vector3()};
     });
     if(followedCat)this.catView=this.cats.find(({model})=>model.appearance===followedCat).model;
     this.executive.place(layout.executive,this.navigator);
@@ -146,18 +169,30 @@ export class SharedOfficeScene {
     this.setLocation(preferences.latitude,preferences.longitude);this.updateLabels();
   }
   setLocation(latitude,longitude){
-    if(!Number.isFinite(latitude)||!Number.isFinite(longitude)){this.location=null;this.solarEvents=null;this.lightingMinute=-1;return;}
-    this.location={latitude,longitude};this.solarEvents=sunriseSunset(new Date(),latitude,longitude);this.lightingMinute=-1;
+    this.location=Number.isFinite(latitude)&&Number.isFinite(longitude)?{latitude,longitude}:null;
+    this.lightingMinute=-1;
   }
   updateLighting(date){
-    const minute=date.getHours()*60+date.getMinutes();if(minute===this.lightingMinute)return;
-    this.lightingMinute=minute;if(this.location)this.solarEvents=sunriseSunset(date,this.location.latitude,this.location.longitude);
-    const daylight=daylightAt(date,this.solarEvents||{sunrise:390,sunset:1140}),darkness=1-daylight;
-    this.sky.intensity=.9+daylight;this.sun.intensity=.45+1.65*daylight;
-    this.scene.background.copy(NIGHT_BACKGROUND).lerp(DAY_BACKGROUND,daylight);
+    const minute=Math.floor(date.getTime()/60000);if(minute===this.lightingMinute)return;
+    this.lightingMinute=minute;
+    const celestial=celestialAt(date,this.location),daylight=this.outdoorSky.update(celestial),darkness=1-daylight;
+    this.sky.intensity=.78+1.12*daylight;
+    const [east,up,south]=celestial.sun.direction;
+    this.sun.intensity=2.1*THREE.MathUtils.smoothstep(up,-.012,.24);
+    this.sun.color.copy(TWILIGHT_LIGHT).lerp(DAY_LIGHT,THREE.MathUtils.smoothstep(up,.04,.35));
+    this.sun.position.set(east,Math.max(.23,up),south).setLength(this.shadowSpan||40).add(this.sun.target.position);
+    this.renderer.shadowMap.needsUpdate=true;
     for(const fixture of this.ambientFixtures)fixture.light.intensity=fixture.maxIntensity*darkness;
     if(this.lampGlowMaterial)this.lampGlowMaterial.emissiveIntensity=.04+darkness*.72;
     this.groundDesign?.updateLighting(darkness);
+  }
+  updateEntrance(dt){
+    const {x,z}=this.layout.entrance;
+    const opening=this.actors.some(({walker})=>walker.walking&&Math.abs(walker.position.x-x)<3.1&&Math.abs(walker.position.z-z)<1.45);
+    const amount=this.motion?THREE.MathUtils.damp(this.doorAmount,Number(opening),12,dt):Number(opening);
+    if(Math.abs(amount-this.doorAmount)<.0001)return;
+    this.doorAmount=amount;
+    this.slideDoors(amount);
   }
   setScenario(scenario){
     this.live=false;this.geometrySignature='';this.stopWalk();for(const actor of this.actors)this.removeActor(actor);this.actors=[];this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');
@@ -182,7 +217,7 @@ export class SharedOfficeScene {
       if(!actor){
         let startPoint=null;
         if(animateArrivals&&assignment.session?.active){
-          startPoint=this.navigator.point(this.navigator.nearest({x:this.layout.bounds.maxX+1.8,z:0}));
+          startPoint=this.navigator.point(this.navigator.nearest(this.layout.entrance.arrival));
         }
         this.addActor(assignment,startPoint);continue;
       }
@@ -197,8 +232,18 @@ export class SharedOfficeScene {
   buildSpace(){
     const root=this.layoutGroup;
     const {minX,maxX,minZ,maxZ}=this.layout.bounds,width=maxX-minX,depth=maxZ-minZ,centerZ=(minZ+maxZ)/2;
-    box(root,0xc3cab9,0,-.37,centerZ,width+.4,.6,depth+.4);const base=tile(root,roundedShape(minX,maxX,minZ,maxZ,.8),'#edf0e5',-.055);base.userData.base=true;
-    this.groundDesign=buildSharedGround(root,this.layout);
+    box(root,0xe2e6d8,0,-.13,centerZ,width+.32,.15,depth+.32).castShadow=false;
+    const terrain=buildOfficeTerrain(this.layout.bounds,this.parking.opening);
+    root.add(terrain);
+    const diagonal=Math.hypot(width,depth);
+    this.outdoorSky.fog.near=Math.max(110,diagonal*1.45);
+    this.outdoorSky.fog.far=this.outdoorSky.fog.near+310;
+    this.shadowSpan=diagonal/2+7;
+    const span=this.shadowSpan;
+    this.sun.target.position.set(0,0,centerZ);
+    Object.assign(this.sun.shadow.camera,{left:-span,right:span,top:span,bottom:-span,far:span*2.2});
+    this.sun.shadow.camera.updateProjectionMatrix();
+    this.groundDesign=buildSharedGround(root,this.layout,terrain);
     this.roomMeshes=new Map();
     for(const room of this.layout.rooms){
       const [x0,x1,z0,z1]=room.bounds,r=ROOM_CORNER_RADIUS;
@@ -217,26 +262,18 @@ export class SharedOfficeScene {
     for(const room of this.layout.rooms){const [x0,x1,z0,z1]=room.bounds;addAmbientFixture((x0+x1)/2,(z0+z1)/2,2.28,.34,8);}
     addAmbientFixture(maxX+.28,0,2.15,.42,7);
     addAmbientFixture(this.layout.executive.bounds[1]+1,this.layout.executive.z,2.15,.34,7);
-    // A cutaway perimeter gives the office depth without hiding the front rooms.
-    box(root,0xe9e5d8,0,1.35,minZ+.1,width,.15+2.5,.18);box(root,0xd0c5ae,0,.14,minZ+.23,width,.18,.09);
-    for(let x=minX+2;x<=maxX-2;x+=4){box(root,0xcfdfd7,x,1.65,minZ+.23,3.4,1.55,.04);for(const dx of [-1.75,0,1.75])box(root,0xfffbec,x+dx,1.65,minZ+.28,.065,1.65,.07);box(root,0xfffbec,x,2.45,minZ+.28,3.55,.07,.07);}
-    box(root,0xe8e6db,minX+.1,.45,centerZ,.16,.9,depth-.2);
-    const entryZ=0,entryHalf=1.55,entryX=maxX-.1;
-    box(root,0xe8e6db,entryX,.45,(minZ+entryZ-entryHalf)/2,.16,.9,entryZ-entryHalf-minZ);
-    box(root,0xe8e6db,entryX,.45,(maxZ+entryZ+entryHalf)/2,.16,.9,maxZ-entryZ-entryHalf);
-    box(root,0xe8e6db,0,.16,maxZ-.1,width,.32,.16);
-    // A glazed automatic entrance opens onto a small exterior landing.
-    box(root,0xd9d4c4,maxX+1.2,-.015,entryZ,2.4,.12,3.3).castShadow=false;
-    box(root,0xb9c9b3,maxX+1.8,.045,entryZ,1.2,.025,2.45).castShadow=false;
-    for(const z of [-entryHalf,entryHalf])box(root,0x788d79,entryX,.1+1.3,z,.16,2.6,.16);
-    box(root,0x788d79,entryX,2.7,entryZ,.16,.16,entryHalf*2+.12);
-    const entryGlass=new THREE.MeshStandardMaterial({color:0x91b7bd,transparent:true,opacity:.42,roughness:.22,metalness:.08,side:THREE.DoubleSide});
-    for(const z of [-1.08,1.08]){
-      box(root,0xaab9ae,maxX-.28,1.08,z,.045,2.05,.055);
-      const pane=new THREE.Mesh(cube,entryGlass);pane.position.set(maxX-.28,1.72,z);pane.scale.set(.035,1.22,.88);pane.castShadow=false;root.add(pane);
-      box(root,0xe8ddc8,maxX-.24,.26,z,.05,.055,.88);
+    const entryGlass=new THREE.MeshStandardMaterial({color:0x9cc9c9,transparent:true,opacity:.27,roughness:.22,depthWrite:false});
+    this.slideDoors=buildPerimeter(root,this.layout,box,cube,entryGlass,this.lampGlowMaterial);
+    this.doorAmount=0;
+    this.officeElevator=buildOfficeElevator(root,this.layout);
+    for(const side of [-1,1]){
+      const z=this.layout.entrance.z+side*2.62,x=maxX+2.92;
+      box(root,0xa7a089,x,.19,z,.68,.38,.66);
+      box(root,0xc4b694,x,.38,z,.75,.09,.73);
+      for(const [dx,dz,size]of [[-.15,-.13,.26],[.12,.10,.25],[.12,-.17,.18]]){
+        mesh(root,sphere,0x718f66,x+dx,.48+size/2,z+dz,size,size*.9,size);
+      }
     }
-    box(root,0xd1bd91,maxX-.17,.055,entryZ,.42,.035,2.9);
     for(const item of this.layout.furniture){
       if(item.type==='partition'){
         box(root,0xc6b8cd,item.x,item.h/2,item.z,item.w,item.h,item.d);box(root,0xdacfe0,item.x,item.h,item.z,item.w+.02,.06,item.d);
@@ -252,12 +289,12 @@ export class SharedOfficeScene {
       // Flush thresholds mark entrances without creating a navigation obstacle.
       box(root,0xe2d7bd,x,.08,z,horizontal?gate.width:.36,.03,horizontal?.36:gate.width);
     }
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.ShadowMaterial({opacity:.13}));ground.rotation.x=-Math.PI/2;ground.position.y=-.69;ground.receiveShadow=true;root.add(ground);
     const knownGeometry=new Set([cube,sphere,cylinder]),knownMaterial=new Set(materialCache.values());
     // Track owned resources before batching; shared office primitives stay alive.
     this.ownedGeometries=new Set();this.ownedMaterials=new Set();
     root.traverse(o=>{if(!o.isMesh||o.userData.landscape)return;if(!knownGeometry.has(o.geometry)&&['ShapeGeometry','ExtrudeGeometry','TorusGeometry','PlaneGeometry','TubeGeometry'].includes(o.geometry.type))this.ownedGeometries.add(o.geometry);if(!knownMaterial.has(o.material)&&o.geometry.type==='ShapeGeometry')this.ownedMaterials.add(o.material);});
-    this.ownedMaterials.add(boundaryGlass);this.ownedMaterials.add(entryGlass);this.ownedMaterials.add(this.lampGlowMaterial);this.ownedMaterials.add(ground.material);batchStatic(root);this.lightingMinute=-1;
+    this.ownedGeometries.add(terrain.geometry);this.ownedMaterials.add(terrain.material);
+    this.ownedMaterials.add(boundaryGlass);this.ownedMaterials.add(entryGlass);this.ownedMaterials.add(this.lampGlowMaterial);batchStatic(root);this.lightingMinute=-1;
   }
   addActor({id,seat,project,index,session=null},startPoint=null){
     const accessories=['beanie','headphones','glasses','cap','scarf','freckles','bowtie','none'];
@@ -269,12 +306,25 @@ export class SharedOfficeScene {
     model.root.position.set(spawn.x,0,spawn.z);model.root.rotation.y=startPoint?Math.atan2(point.x-spawn.x,point.z-spawn.z):seat.heading;model.root.userData.sessionId=id;model.root.traverse(o=>{if(o.isMesh)o.castShadow=false;});
     const marker=new THREE.Mesh(new THREE.RingGeometry(.39,.48,24),new THREE.MeshBasicMaterial({color:project.color,side:THREE.DoubleSide,transparent:true,opacity:.9}));marker.rotation.x=-Math.PI/2;marker.position.set(spawn.x,.038,spawn.z);this.world.add(marker);
     const name=session?.identity?.name||['Alex','Riley','Noah','Ethan','Luca','Kai','Mia','Leo','Owen','Ivy','Aria','Finn'][index%12];
-    const label=document.createElement('button');label.className='study-agent-label';label.style.setProperty('--project',project.color);const nameLine=document.createElement('strong'),nameText=document.createElement('span'),rankLine=document.createElement('small'),projectLine=document.createElement('small'),actionLine=document.createElement('span');nameLine.append(nameText,rankLine);rankLine.className='study-agent-rank';projectLine.className='study-agent-project';actionLine.className='study-agent-action';label.append(nameLine,projectLine,actionLine);label.addEventListener('click',()=>this.onActor?.(id));this.labelLayer.append(label);
+    const label=document.createElement('button');
+    label.className='study-agent-label';
+    label.style.setProperty('--project',project.color);
+    const rankLine=document.createElement('small'),projectLine=document.createElement('small'),actionLine=document.createElement('span');
+    rankLine.className='study-agent-rank';
+    projectLine.className='study-agent-project';
+    actionLine.className='study-agent-action';
+    const metadata=document.createElement('span');
+    metadata.className='study-agent-metadata';
+    metadata.append(projectLine,rankLine);
+    label.append(actionLine,metadata);
+    label.addEventListener('click',()=>this.onActor?.(id));
+    this.labelLayer.append(label);
     const walker=new OfficeWalker(this.navigator,spawn);if(startPoint)walker.setDestination(point,seat.room);
     const actor={id,model,label,marker,seat,project,index,session,walker,name};
     this.actorLabels.add(label,{
-      model:()=>actor.model,selected:()=>actor.id===this.selectedId,
+      model:()=>actor.model,name:()=>actor.name,selected:()=>actor.id===this.selectedId,
       working:()=>!actor.departing&&(!actor.session||actor.session.active||actor.session.error||(actor.commandUntil||0)>performance.now()),
+      showMetadata:()=>!actor.departing&&Boolean(actor.session?.active),
       summary:()=>actor.departing?'↗ 퇴근':actor.session?.finished?'✓ 완료':actor.session&&!actor.session.active?'◷ 응답 대기':({nap:'☾ 낮잠',game:'◇ 게임',read:'▤ 독서',relax:'☕ 휴식',stretch:'↟ 스트레칭'}[actor.session?.identity?.idle]||'… 대기'),
     });
     for(const [key,prop]of Object.entries(model.props))prop.visible=key===seat.mode;
@@ -283,9 +333,20 @@ export class SharedOfficeScene {
   }
   departActor(actor){
     actor.departing=true;actor.session=null;actor.label.dataset.state='departing';actor.label.querySelector('.study-agent-action').textContent='출입구로 이동 중';
-    actor.walker.setDestination({x:this.layout.bounds.maxX+1.8,z:0},null);
+    actor.walker.setDestination(this.layout.entrance.arrival,null);
   }
-  updateActorLabel(actor){const room=SHARED_ROOMS.find(r=>r.key===actor.seat.room).name,receiving=(actor.commandUntil||0)>performance.now(),activity=receiving?'☎ CEO의 지시를 확인하는 중':actor.session?(actor.session.active?(actor.session.codexNote||actor.session.label||`${room}에서 작업 중`):actor.session.finished?'작업 완료 · 휴식 중':'응답 대기 중'): `${room}에서 함께 일하는 중`,rank=actor.session?.hasParent?'서브에이전트':'메인 세션',nameText=actor.label.querySelector('strong > span'),rankLine=actor.label.querySelector('.study-agent-rank'),projectLine=actor.label.querySelector('.study-agent-project'),actionLine=actor.label.querySelector('.study-agent-action');nameText.textContent=actor.name;rankLine.textContent=rank;projectLine.textContent=actor.project.name||actor.project.code;actionLine.textContent=activity;actor.label.title=`${actor.name} · ${rank} · ${actor.project.name} · ${activity}`;actor.label.setAttribute('aria-label',`${actor.name} · ${rank} · ${actor.project.name} 프로젝트 · ${activity} · ${room}`);actor.label.dataset.error=String(Boolean(actor.session?.error));}
+  updateActorLabel(actor){
+    const room=SHARED_ROOMS.find(r=>r.key===actor.seat.room).name,receiving=(actor.commandUntil||0)>performance.now();
+    const activity=receiving?'☎ CEO의 지시를 확인하는 중':actor.session?(actor.session.active?(actor.session.codexNote||actor.session.label||`${room}에서 작업 중`):actor.session.finished?'작업 완료 · 휴식 중':'응답 대기 중'):`${room}에서 함께 일하는 중`;
+    const rank=actor.session?.hasParent?'서브에이전트':'메인 세션';
+    const project=actor.project.name||actor.project.code;
+    actor.label.querySelector('.study-agent-rank').textContent=rank;
+    actor.label.querySelector('.study-agent-project').textContent=project;
+    actor.label.querySelector('.study-agent-action').textContent=activity;
+    const metadata=actor.session?.active?` · ${rank} · ${project} 프로젝트`:'';
+    actor.label.setAttribute('aria-label',`${actor.name} · ${activity}${metadata}`);
+    actor.label.dataset.error=String(Boolean(actor.session?.error));
+  }
   setProject(key){
     this.project=key;for(const actor of this.actors){const visible=!key||actor.project.key===key;actor.model.root.visible=visible;actor.marker.visible=visible;actor.label.hidden=!visible;}
     if(this.selectedId&&!this.actors.find(a=>a.id===this.selectedId)?.model.root.visible)this.selectedId=null;
@@ -331,43 +392,114 @@ export class SharedOfficeScene {
     }
   }
   focus(to,zoom,model){this.transition={from:this.viewTarget.clone(),to,zoomFrom:this.zoom,zoomTo:zoom,start:performance.now(),model};}
-  resetView(){this.leaveCatView();this.orbitFrame=null;this.transition=null;this.angle=.48;this.elevation=.72;this.zoom=1;this.selectedRoom=null;this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.viewTarget.set(0,0,0);for(const m of [...(this.roomMeshes?.values()||[]),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}this.resize();}
+  setParkingView(enabled){
+    if(!this.parking||enabled===Boolean(this.parkingView))return;
+    this.leaveCatView();
+    this.transition=null;
+    if(enabled){
+      this.officeCameraView={angle:this.angle,elevation:this.elevation,zoom:this.zoom,orbitFrame:this.orbitFrame,target:this.viewTarget.clone()};
+    }else{
+      const {angle,elevation,zoom,orbitFrame,target}=this.officeCameraView;
+      Object.assign(this,{angle,elevation,zoom,orbitFrame});
+      this.viewTarget.copy(target);
+      this.officeCameraView=null;
+    }
+    this.parkingView=enabled;
+    this.parking.group.visible=enabled;
+    this.world.visible=this.outdoorSky.mesh.visible=this.sky.visible=this.sun.visible=!enabled;
+    this.scene.background=enabled?PARKING_BACKGROUND:null;
+    this.labelLayer.hidden=enabled;
+    this.renderer.domElement.setAttribute('aria-label',enabled?'지하 1층 주차장 3D 공간. 드래그로 이동, Shift + 드래그로 회전, 스크롤로 확대합니다.':MAP_CAMERA_LABEL);
+    this.renderer.shadowMap.needsUpdate=!enabled;
+    if(enabled)this.resetView();
+    else this.resize();
+    this.onFloor?.(enabled);
+  }
+  resetView(){
+    if(this.parkingView){
+      this.orbitFrame=this.transition=null;
+      this.angle=.56;this.elevation=47*Math.PI/180;this.zoom=1;
+      this.frameOverview();this.resize();return;
+    }
+    this.leaveCatView();this.orbitFrame=null;this.transition=null;this.angle=.48;this.elevation=MAP_ELEVATION;this.zoom=1;this.selectedRoom=null;this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.frameOverview();for(const m of [...(this.roomMeshes?.values()||[]),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}this.resize();}
   setElevation(degrees){this.transition=null;this.elevation=THREE.MathUtils.clamp(Number(degrees),12,89)*Math.PI/180;this.resize();}
-  setZoom(value){this.transition=null;this.zoom=THREE.MathUtils.clamp(value,.65,12);this.resize();}
+  setZoom(value){this.transition=null;this.zoom=THREE.MathUtils.clamp(value,MIN_MAP_ZOOM,12);this.resize();}
+  frameOverview(){
+    if(this.parkingView){this.viewTarget.copy(this.parking.target);return;}
+    const bounds=this.layout?.bounds;
+    this.viewTarget.set(bounds?(bounds.minX+bounds.maxX)/2:0,0,bounds?(bounds.minZ+bounds.maxZ)/2:0);
+  }
   resize(){
-    const width=this.element.clientWidth,height=this.element.clientHeight;if(!width||!height)return;this.width=width;this.height=height;this.renderer.setSize(width,height,false);
-    const floorBounds=this.layout?.bounds||{minX:-20,maxX:20,minZ:-12,maxZ:12},diagonal=Math.hypot(floorBounds.maxX-floorBounds.minX,floorBounds.maxZ-floorBounds.minZ),radius=Math.max(65,diagonal*1.2);this.camera.far=radius+diagonal+20;this.camera.position.set(this.viewTarget.x+Math.sin(this.angle)*Math.cos(this.elevation)*radius,this.viewTarget.y+Math.sin(this.elevation)*radius,this.viewTarget.z+Math.cos(this.angle)*Math.cos(this.elevation)*radius);this.camera.lookAt(this.viewTarget);this.camera.updateMatrixWorld();
+    const width=this.element.clientWidth,height=this.element.clientHeight;
+    if(!width||!height)return;
+    if(width!==this.width||height!==this.height)this.renderer.setSize(width,height,false);
+    this.width=width;this.height=height;
+    const camera=this.camera,aspect=width/height;
+    const elevation=Math.max(this.elevation,Math.PI/36);
+    const back=new THREE.Vector3(Math.sin(this.angle)*Math.cos(elevation),Math.sin(elevation),Math.cos(this.angle)*Math.cos(elevation));
+    const right=new THREE.Vector3(Math.cos(this.angle),0,-Math.sin(this.angle)),up=back.clone().cross(right);
+    const bounds=this.layout?.navigationBounds||this.layout?.bounds||{minX:-20,maxX:20,minZ:-12,maxZ:12};
+    const panMaxX=this.parkingView?this.parking.opening.maxX:bounds.maxX;
+    this.viewTarget.x=THREE.MathUtils.clamp(this.viewTarget.x,bounds.minX,panMaxX);
+    this.viewTarget.z=THREE.MathUtils.clamp(this.viewTarget.z,bounds.minZ,bounds.maxZ);
+    const tanHalfFov=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+    let distance=this.orbitFrame?.distance;
+    if(!distance){
+      const center=this.parkingView?this.parking.target:new THREE.Vector3((bounds.minX+bounds.maxX)/2,0,(bounds.minZ+bounds.maxZ)/2);
+      let points=this.parkingView?this.parking.framePoints:[];
+      if(!this.parkingView){
+        for(const x of [bounds.minX-2,bounds.maxX+2])for(const z of [bounds.minZ-2,bounds.maxZ+2])for(const y of [GROUND_LEVEL,3.5]){
+          points.push(new THREE.Vector3(x,y,z));
+        }
+      }
+      const offset=new THREE.Vector3();
+      distance=0;
+      for(const point of points){
+        offset.copy(point).sub(center);
+        const extent=Math.max(Math.abs(offset.dot(right))/(aspect*.88),Math.abs(offset.dot(up))/.8);
+        distance=Math.max(distance,offset.dot(back)+extent/tanHalfFov);
+      }
+    }
+    distance/=this.zoom;
+    if(!this.parkingView){
+      const cityBoundary=bounds.minZ-CITY_CAMERA_LIMIT;
+      if(back.z<0)distance=Math.min(distance,(this.viewTarget.z-cityBoundary)/-back.z);
+    }
+    camera.aspect=aspect;
+    camera.near=Math.max(.16,distance*.024);
+    camera.position.copy(this.viewTarget).addScaledVector(back,distance);
+    camera.lookAt(this.viewTarget);
+    camera.updateMatrixWorld();
+    camera.updateProjectionMatrix();
     if(this.catCamera){
-      this.catCamera.aspect=width/height;
-      this.catCamera.far=this.camera.far;
+      this.catCamera.aspect=aspect;
       this.catCamera.updateProjectionMatrix();
     }
-    // Overview extents are computed once around the floor origin; zoom then centers on the selected target.
-    const right=new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld,0),up=new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld,1),points=[];
-    const bounds=this.layout?.navigationBounds||this.layout?.bounds||{minX:-20,maxX:20,minZ:-12,maxZ:12};
-    for(const x of [bounds.minX-.7,bounds.maxX+.7])for(const z of [bounds.minZ-.7,bounds.maxZ+.7])for(const y of [-.7,3.4])points.push(new THREE.Vector3(x,y,z));
-    const xs=points.map(p=>p.dot(right)),ys=points.map(p=>p.dot(up));const halfH=this.orbitFrame?orbitHalfHeight(this,width/height):Math.max((Math.max(...ys)-Math.min(...ys))/2,(Math.max(...xs)-Math.min(...xs))/(width/height)/2)*1.07/this.zoom;
-    const midY=!this.orbitFrame&&this.zoom===1?(Math.max(...ys)+Math.min(...ys))/2:0,midX=!this.orbitFrame&&this.zoom===1?(Math.max(...xs)+Math.min(...xs))/2:0;this.camera.left=midX-halfH*width/height;this.camera.right=midX+halfH*width/height;this.camera.top=midY+halfH;this.camera.bottom=midY-halfH;this.camera.updateProjectionMatrix();this.updateLabels();this.onView?.({zoom:this.zoom,elevation:Math.round(this.elevation*180/Math.PI)});
+    this.updateLabels();
+    this.onView?.({zoom:this.zoom,elevation:Math.round(elevation*180/Math.PI),parking:Boolean(this.parkingView)});
   }
   pick(event){
+    if(this.parkingView)return;
     const b=this.renderer.domElement.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((event.clientX-b.left)/b.width*2-1,1-(event.clientY-b.top)/b.height*2),this.camera);
     const roots=this.actors.filter(a=>a.model.root.visible).map(a=>a.model.root);if(this.executive.owner.root.visible)roots.push(this.executive.owner.root);if(this.visitor?.model.root.visible)roots.push(this.visitor.model.root);const secretary=this.executive.assisting?this.executive.companion:this.executive.secretary;if(secretary?.root.visible)roots.push(secretary.root);const hits=ray.intersectObjects([...roots,...this.cats.map(({model})=>model.root),...this.roomMeshes.values(),...this.executive.floors.values()],true);
     for(const hit of hits){let o=hit.object;while(o){if(o.userData.catIndex!==undefined){this.selectCat(this.cats[o.userData.catIndex].model);return;}if(o.userData.owner){this.onOwner?.();return;}if(o.userData.ambientCharacter){this.selectAmbient(o.userData.ambientCharacter);return;}if(o.userData.sessionId){this.onActor?.(o.userData.sessionId);return;}if(o.userData.room){this.onRoom?.(o.userData.room);return;}o=o.parent;}}
   }
   selectAmbient(kind){const model=kind==='visitor'?this.visitor?.model:(this.executive.assisting?this.executive.companion:this.executive.secretary);if(!model?.root.visible)return;this.leaveCatView();this.selectedAmbient=this.selectedAmbient===kind?null:kind;this.visitor.model.selection.visible=this.selectedAmbient==='visitor';this.executive.secretary.selection.visible=this.selectedAmbient==='secretary';this.executive.companion.selection.visible=this.selectedAmbient==='secretary';this.visitor.label.classList.toggle('selected',this.selectedAmbient==='visitor');this.executive.secretaryLabel.classList.toggle('selected',this.selectedAmbient==='secretary');if(this.selectedAmbient)this.focusCharacter(model);}
-  projectPoint(node,point){const p=point.clone().project(this.camera);node.hidden=p.x<-.97||p.x>.97||p.y<-.95||p.y>.95;node.style.left=`${(p.x+1)*this.width/2}px`;node.style.top=`${(1-p.y)*this.height/2}px`;return {x:(p.x+1)*this.width/2,y:(1-p.y)*this.height/2};}
+  projectPoint(node,point){const p=point.clone().project(this.camera);node.hidden=p.z< -1||p.z>1||p.x<-.97||p.x>.97||p.y<-.95||p.y>.95;node.style.left=`${(p.x+1)*this.width/2}px`;node.style.top=`${(1-p.y)*this.height/2}px`;return {x:(p.x+1)*this.width/2,y:(1-p.y)*this.height/2};}
   updateLabels(){
-    if(!this.width||!this.layout||this.catView)return;
+    if(!this.width||!this.layout||this.catView||this.parkingView)return;
     for(const {node,point}of this.roomLabels.values())this.projectPoint(node,point);
-    this.projectPoint(this.entryLabel,new THREE.Vector3(this.layout.bounds.maxX+1.2,2.9,0));
+    this.projectPoint(this.entryLabel,new THREE.Vector3(this.layout.entrance.x+1.65,3.42,this.layout.entrance.z));
     const garden=this.layout.park.label;this.projectPoint(this.gardenLabel,new THREE.Vector3(garden.x,.35,garden.z));
     if(this.executive.layout)this.executive.updateLabels((node,point)=>this.projectPoint(node,point),this.zoom);
-    for(const {model,label,anchor} of this.cats){
+    for(const {model,label,actionLabel,anchor} of this.cats){
       if(this.showLabels){
         anchor.copy(model.root.position);
-        anchor.y+=model.root.scale.y*1.18;
         this.projectPoint(label,anchor);
-      }else label.hidden=true;
+        anchor.y+=model.root.scale.y*1.18;
+        if(actionLabel.textContent)this.projectPoint(actionLabel,anchor);
+        else actionLabel.hidden=true;
+      }else label.hidden=actionLabel.hidden=true;
     }
     this.actorLabels?.update(this.camera,this.width,this.height,this.showLabels);
   }
@@ -412,17 +544,18 @@ export class SharedOfficeScene {
   }
   frame(time){
     this.frameHandle=requestAnimationFrame(this.frame);const dt=Math.min((time-this.lastTime)/1000,.05);this.lastTime=time;if(document.hidden)return;this.updateLighting(new Date());
-    for(const actor of this.actors)this.updateActor(actor,dt,time);this.actors=this.actors.filter(actor=>!actor.departed);
+    for(const actor of this.actors)this.updateActor(actor,dt,time);this.actors=this.actors.filter(actor=>!actor.departed);this.updateEntrance(dt);
     this.executive.update(dt,time,this.motion,this.actors);
-    for(const {model,label} of this.cats){
+    for(const {model,label,actionLabel} of this.cats){
       const neighbor=this.cats.find(other=>other.model!==model&&
         other.model.root.position.distanceToSquared(model.root.position)<1.2**2);
       model.update(dt,this.motion,neighbor?.model.root.position);
-      if(label.dataset.action!==model.action){
-        label.dataset.action=model.action;
+      if(actionLabel.dataset.action!==model.action){
+        actionLabel.dataset.action=model.action;
         const action=CAT_ACTION_LABELS[model.action];
-        label.textContent=action?`${model.appearance.name} · ${action}`:model.appearance.name;
-        label.setAttribute('aria-label',`${label.textContent} · 고양이 시점으로 보기`);
+        actionLabel.textContent=action||'';
+        const name=model.appearance.name;
+        label.setAttribute('aria-label',`${action?`${name} · ${action}`:name} · 고양이 시점으로 보기`);
       }
     }
     if(this.ownerStatusText!==this.executive.patrol.text){this.ownerStatusText=this.executive.patrol.text;this.onOwnerStatus?.();}
@@ -438,7 +571,18 @@ export class SharedOfficeScene {
       if(t===1)this.transition=null;
       this.resize();
     }else this.updateLabels();
-    this.renderer.render(this.scene,this.catView?this.catCamera:this.camera);
+    const camera=this.catView?this.catCamera:this.camera;
+    if(!this.parkingView)this.outdoorSky.orient(camera);
+    this.renderer.render(this.scene,camera);
   }
-  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();this.visitor.destroy(disposeCharacter);for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.clearCats();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
+  disposeLayout(){
+    this.parking?.dispose();
+    this.groundDesign?.dispose();
+    this.layoutGroup?.removeFromParent();
+    for(const geometry of this.ownedGeometries||[])geometry.dispose();
+    for(const material of this.ownedMaterials||[])material.dispose();
+    this.officeElevator?.dispose();this.officeElevator=null;
+    for(const light of this.lights)light.mesh.material.dispose();
+  }
+  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();this.visitor.destroy(disposeCharacter);for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.clearCats();this.disposeLayout();this.outdoorSky.dispose();this.renderer.dispose();this.element.replaceChildren();}
 }

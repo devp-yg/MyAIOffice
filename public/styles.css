@@ -128,3 +128,10 @@ body.evening{color-scheme:dark;--bg:#1d2826;--surface:#25332e;--ink:#e1e8d9;--mu
 .world-agent-label.secretary-label.selected{background:#536a5b!important;border-color:#3f5647!important;color:#fffbed!important;box-shadow:0 3px 14px #263a2855!important}
 .world-agent-label.secretary-label.selected strong,.world-agent-label.secretary-label.selected strong>span,.world-agent-label.secretary-label.selected .secretary-action{color:#fffbed!important}
 .world-agent-label.secretary-label.selected .secretary-rank{background:#ffffff26!important;border-color:#ffffff40!important;color:#fff!important}
+/* Room names are fixed architectural plaques in each zone, rather than floating speech bubbles. */
+.world-room-label{--room-sign:#82946c;position:relative;overflow:visible;padding:5px 10px 5px 8px;border:1px solid color-mix(in srgb,var(--room-sign) 42%,#e9e4d4);border-top:3px solid var(--room-sign);border-radius:2px;background:#f8f4e8;color:#465641;box-shadow:0 2px 0 #3d493326,0 4px 9px #35452e20;backdrop-filter:none;letter-spacing:-.25px}
+.world-room-label::after{content:"";position:absolute;top:100%;left:50%;width:2px;height:9px;background:color-mix(in srgb,var(--room-sign) 62%,#918873);transform:translateX(-50%);box-shadow:1px 0 #fff9}
+.world-room-label i{width:5px;height:5px;border-radius:0;background:var(--room-sign)}
+.world-room-label[data-room="library"]{--room-sign:#a58756}.world-room-label[data-room="studio"]{--room-sign:#718b60}.world-room-label[data-room="server"]{--room-sign:#708e9e}.world-room-label[data-room="research"]{--room-sign:#628e7e}.world-room-label[data-room="meeting"]{--room-sign:#9276a8}.world-room-label[data-room="desk"]{--room-sign:#aa875e}.world-room-label[data-room="executive"]{--room-sign:#9b875e}
+.world-room-label:hover,.world-room-label.selected{border-color:var(--room-sign);border-top-color:var(--room-sign);background:#fffdf4;box-shadow:0 2px 0 #3d493326,0 0 0 2px color-mix(in srgb,var(--room-sign) 18%,transparent),0 4px 10px #35452e20}
+.world-room-label.selected i{background:var(--room-sign)}

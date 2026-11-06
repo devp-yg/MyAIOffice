@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../public/vendor/three/three.module.js';
 import {beginCameraOrbit} from '../public/office-camera.js';
 import {OfficeNavigator} from '../public/office-navigation.js';
+import {CITY_CAMERA_LIMIT} from '../public/shared-office-ground.js';
 
 globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},fillText(){}})})};
 const {OfficeScene}=await import('../public/office-scene.js');
@@ -18,7 +19,7 @@ function sceneFor(Scene,{zoom=1,executive=false}={}){
       addEventListener(type,handler){handlers.set(type,handler);},
       setPointerCapture(){},hasPointerCapture(){return false;},setAttribute(){},
     }},
-    camera:new THREE.OrthographicCamera(-20,20,12,-12,.1,180),
+    camera:Scene===SharedOfficeScene?new THREE.PerspectiveCamera(57,1,.16,850):new THREE.OrthographicCamera(-20,20,12,-12,.1,180),
     angle:.48,elevation:.72,zoom,viewTarget:new THREE.Vector3(),
     navigator:{executive},updateLabels(){},
     layout:{bounds:{minX:-35,maxX:22,minZ:-16,maxZ:24}},
@@ -31,6 +32,11 @@ function sceneFor(Scene,{zoom=1,executive=false}={}){
 function centreOnGround(view){
   const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(),view.camera);
   return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());
+}
+
+function viewSpan(view){
+  const {camera,viewTarget}=view;
+  return camera.isPerspectiveCamera?2*camera.position.distanceTo(viewTarget)/camera.projectionMatrix.elements[5]:camera.top-camera.bottom;
 }
 
 function assertCentred(view,pivot){
@@ -46,19 +52,19 @@ for(const Scene of [OfficeScene,SharedOfficeScene]){
       handlers.get('pointerdown')({button:0,shiftKey:false,clientX:0,clientY:0,pointerId:1});
       handlers.get('pointermove')({clientX:160,clientY:-90});
       handlers.get('pointerup')({button:0,pointerId:1});
-      const pivot=centreOnGround(view),span=view.camera.top-view.camera.bottom;
+      const pivot=centreOnGround(view),span=viewSpan(view);
       // Orbit is about the viewport centre even when the drag starts elsewhere.
       handlers.get('pointerdown')({button:0,shiftKey:true,clientX:80,clientY:140,pointerId:2});
       for(const [x,y] of [[120,160],[400,200],[-300,260]]){
         handlers.get('pointermove')({clientX:x,clientY:y});
         assertCentred(view,pivot);
-        assert.ok(Math.abs((view.camera.top-view.camera.bottom)-span)<1e-9,'rotation changed zoom');
+        assert.ok(Math.abs(viewSpan(view)-span)<1e-9,'rotation changed zoom');
       }
       handlers.get('pointerup')({button:0,pointerId:2});
       const frame={...view.orbitFrame};view.resize();
       assertCentred(view,pivot);assert.deepEqual(view.orbitFrame,frame);
       view.setZoom(zoom*.8);assertCentred(view,pivot);
-      assert.ok(Math.abs((view.camera.top-view.camera.bottom)-span/ .8)<1e-9);
+      assert.ok(Math.abs(viewSpan(view)-span/ .8)<1e-9);
     });
   }
   test(`${Scene.name} keyboard rotation shares the viewport pivot`,()=>{
@@ -75,6 +81,41 @@ for(const Scene of [OfficeScene,SharedOfficeScene]){
     assert.ok(Math.abs(before.y-after.y)<1e-9);
   });
 }
+
+test('shared-office vertical panning follows the drag and keeps the camera above the ground',()=>{
+  const {view,handlers}=sceneFor(SharedOfficeScene);
+  const pivot=centreOnGround(view);
+  handlers.get('pointerdown')({button:0,shiftKey:false,clientX:0,clientY:0,pointerId:1});
+  handlers.get('pointermove')({clientX:0,clientY:90});
+  assert.ok(pivot.clone().project(view.camera).y<0);
+  assert.equal(view.viewTarget.y,0);
+});
+
+test('shared-office panning stops at all four office edges',()=>{
+  const {view,handlers}=sceneFor(SharedOfficeScene);
+  const {minX,maxX,minZ,maxZ}=view.layout.bounds;
+  view.angle=0;
+  view.resize();
+  for(const [dx,dy,x,z] of [[-8000,8000,maxX,minZ],[8000,-8000,minX,maxZ]]){
+    handlers.get('pointerdown')({button:0,shiftKey:false,clientX:0,clientY:0,pointerId:1});
+    handlers.get('pointermove')({clientX:dx,clientY:dy});
+    handlers.get('pointerup')({button:0,pointerId:1});
+    assert.deepEqual([view.viewTarget.x,view.viewTarget.z],[x,z]);
+    assertCentred(view,view.viewTarget);
+  }
+});
+
+test('shared-office zoom-out stops at 80% and a narrow viewport keeps the camera short of downtown',()=>{
+  const {view}=sceneFor(SharedOfficeScene);
+  const boundary=view.layout.bounds.minZ-CITY_CAMERA_LIMIT;
+  view.element.clientWidth=240;
+  view.viewTarget.z=view.layout.bounds.minZ;
+  view.angle=Math.PI;
+  view.setZoom(.1);
+  assert.equal(view.zoom,.8);
+  assert.ok(view.camera.position.z>=boundary-1e-9);
+  assertCentred(view,view.viewTarget);
+});
 
 test('near-horizontal orbit keeps a finite pivot and does not jump on re-framing',()=>{
   const {view}=sceneFor(OfficeScene);
@@ -103,11 +144,11 @@ test('tower bubble click selects the character and makes it the camera pivot',t=
   model.root.position.set(4,.32,3);
   view.viewTarget.set(-8,0,-5);view.resize();
   const centre=model.body.localToWorld(new THREE.Vector3(0,.8,0));
-  const span=view.camera.top-view.camera.bottom;
+  const span=viewSpan(view);
   label.dispatchEvent(new Event('click'));
   assert.equal(view.selectedId,'staff');
   assertCentred(view,centre);
-  assert.ok(Math.abs((view.camera.top-view.camera.bottom)-span)<1e-9);
+  assert.ok(Math.abs(viewSpan(view)-span)<1e-9);
   handlers.get('keydown')({key:'ArrowRight',preventDefault(){}});
   assertCentred(view,centre);
 });
@@ -122,7 +163,7 @@ test('shared-office selection centres the rendered character after movement duri
     actors:[{id:'staff',model,label}],
     executive:{owner:{selection:{}},ownerLabel:label,floors:new Map(),update(){},patrol:{},spouseTargets(){}},
     cats:[],visitor:{update(){}},roomMeshes:new Map(),motion:true,
-    updateLighting(){},updateActor(){root.position.x+=3;},renderer:{...view.renderer,render(){}},
+    updateLighting(){},updateEntrance(){},outdoorSky:{orient(){}},updateActor(){root.position.x+=3;},renderer:{...view.renderer,render(){}},
     lastTime:performance.now(),
   });
   t.after(()=>{delete globalThis.document;delete globalThis.requestAnimationFrame;});
@@ -150,9 +191,9 @@ test('cat view follows the animated head and returns to the same map framing',t=
   const label={dataset:{action:'walk'},classList:{remove(){},toggle(){}},setAttribute(){}};
   Object.assign(view,{
     catCamera:new THREE.PerspectiveCamera(65,1,.035,180),catLookTarget:new THREE.Vector3(),
-    cats:[{model,label}],labelLayer:{hidden:false},actors:[],roomMeshes:new Map(),
+    cats:[{model,label,actionLabel:label}],labelLayer:{hidden:false},actors:[],roomMeshes:new Map(),
     executive:{owner:{selection:{}},ownerLabel:label,floors:new Map(),update(){},patrol:{},spouseTargets(){}},
-    visitor:{update(){}},updateLighting(){},onCatView:name=>views.push(name),
+    visitor:{update(){}},updateLighting(){},updateEntrance(){},outdoorSky:{orient(){}},onCatView:name=>views.push(name),
     lastTime:performance.now(),renderer:{...view.renderer,render(_scene,camera){cameras.push(camera);}},
   });
   t.after(()=>{delete globalThis.document;delete globalThis.requestAnimationFrame;});
@@ -174,6 +215,7 @@ test('cat view follows the animated head and returns to the same map framing',t=
   assert.ok(view.catCamera.getWorldDirection(new THREE.Vector3()).distanceTo(forward)<1e-9);
   view.element.clientWidth=480;view.resize();
   assert.equal(view.catCamera.aspect,480/800);
+  view.element.clientWidth=1200;view.resize();
 
   view.leaveCatView();
   view.frame(view.lastTime+16);

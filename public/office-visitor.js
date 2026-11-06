@@ -224,6 +224,7 @@ export class SpouseWatch {
 export class OfficeVisitor {
   constructor(world,labelLayer,createCharacter,{shared=false,preferences=DEFAULT_PREFERENCES}={}){
     this.model=createCharacter(world,'meeting',{index:7,pregnant:true,accessory:'none'});
+    this.shared=shared;
     this.label=document.createElement('button');
     this.label.type='button';
     this.label.className=shared?'study-agent-label visitor-label':'world-agent-label visitor-label show-task';
@@ -281,10 +282,12 @@ export class OfficeVisitor {
   refreshPregnancy(date=new Date()){
     const progress=pregnancyProgress(date,this.profile.dueDate),label=progress?.label||'임산부';
     if(this.progress?.label===label)return;
-    this.progress=progress||{label};this.title.textContent=`${this.profile.name} · ${label}`;
+    this.progress=progress||{label};
+    const description=`${this.profile.name} · ${label}`;
+    this.title.textContent=this.shared?label:description;
     const shape=maternityShape(progress?.weeks??20,progress?.days??0);
     if(this.model.belly){this.model.belly.scale.set(shape.x,shape.y,shape.z);this.model.belly.position.set(0,shape.centerY,shape.centerZ);}
-    this.label.title=[this.title.textContent,this.profile.baby,this.profile.dueDate?`출산 예정일 ${this.profile.dueDate}`:''].filter(Boolean).join(' · ');
+    this.label.title=[description,this.profile.baby,this.profile.dueDate?`출산 예정일 ${this.profile.dueDate}`:''].filter(Boolean).join(' · ');
     this.updateAccessibleLabel();
   }
   updateAccessibleLabel(){this.label.setAttribute('aria-label',[this.profile.name,this.progress.label,this.profile.baby,this.profile.role,this.action.textContent,this.profile.dueDate?`출산 예정일 ${this.profile.dueDate}`:''].filter(Boolean).join(' · '));}

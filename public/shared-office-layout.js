@@ -165,6 +165,7 @@ export function createSharedLayout(scenario='full'){
     label:{x:16,z:courtyardStart+7},
     trees:[[9,courtyardStart+4.1,.9],[20,courtyardStart+4.2,1.05],[10,courtyardStart+9.8,1],[20,courtyardStart+9.7,.85]],
     benches:[]};
+  const elevator={x:park.label.x,z:bounds.maxZ+1.35,width:3.4,depth:3.2};
   const landscape={beds:[],trees:[],benches:[]};
 
   // Keep the public promenade outside the private wing's 2 m buffer, with
@@ -204,6 +205,7 @@ export function createSharedLayout(scenario='full'){
   path('garden-arrival',[19.4,promenadeZ],[19.4,courtyardStart+1.3]);
   path('garden-east',[24.4,courtyardStart+1.3],[24.4,courtyardStart+12.4]);
   path('garden-south',[spineX,courtyardStart+12.4],[24.4,courtyardStart+12.4]);
+  path('park-elevator',[elevator.x,courtyardStart+12.4],[elevator.x,elevator.z-elevator.depth/2+.12],3.6);
   // Rest bays branch off the clear walking lanes. The approach remains a real
   // walkable destination; the solid seat/backrest are navigation obstacles.
   const rest=(id,x,z,rotation=0)=>{
@@ -233,13 +235,26 @@ export function createSharedLayout(scenario='full'){
   rest('garden-south',15,courtyardStart+10.5);
   const restStops=landscape.benches.map(bench=>({id:bench.id,...bench.approach,heading:bench.rotation,bench}));
   const landscapeBlockers=[...landscape.benches,...landscape.beds.map(([x0,x1,z0,z1])=>({type:'garden-bed',x:(x0+x1)/2,z:(z0+z1)/2,w:x1-x0,d:z1-z0,h:.3}))];
+  const wallDepth=.26,wallHeight=2.85;
+  const entrance={x:bounds.maxX,z:0,width:5.4,clearWidth:3.4,arrival:{x:bounds.maxX+1.8,z:0}};
+  const perimeter=[];
+  const outerWall=(x,z,w,d)=>perimeter.push({type:'perimeter-wall',x,z,w,d,h:wallHeight});
+  outerWall(0,bounds.minZ,bounds.maxX-bounds.minX+wallDepth,wallDepth);
+  outerWall((bounds.minX+elevator.x-elevator.width/2)/2,bounds.maxZ,elevator.x-elevator.width/2-bounds.minX,wallDepth);
+  outerWall((elevator.x+elevator.width/2+bounds.maxX)/2,bounds.maxZ,bounds.maxX-elevator.x-elevator.width/2,wallDepth);
+  outerWall(bounds.minX,(bounds.minZ+bounds.maxZ)/2,wallDepth,bounds.maxZ-bounds.minZ);
+  const halfGate=entrance.width/2;
+  outerWall(entrance.x,(bounds.minZ-halfGate)/2,wallDepth,-halfGate-bounds.minZ);
+  outerWall(entrance.x,(bounds.maxZ+halfGate)/2,wallDepth,bounds.maxZ-halfGate);
+  const clearHalf=entrance.clearWidth/2;
+  const sidelights=[-1,1].map(side=>({x:entrance.x,z:side*(halfGate+clearHalf)/2,w:wallDepth,d:halfGate-clearHalf,h:2.62}));
   const circulation={paths,hub:{x:spineX,z:0},gardenVisit:{x:spineX,z:executive.z},restStops};
   const contains=(point,rect,inset=0)=>point.x>=rect[0]+inset&&point.x<=rect[1]-inset&&point.z>=rect[2]+inset&&point.z<=rect[3]-inset;
   const regionAt=point=>rooms.find(room=>contains(point,room.bounds))?.key||(contains(point,executive.bounds)?'executive':null);
   const executiveBlockers=[...EXECUTIVE_WALLS.filter(w=>!w.elevator),...EXECUTIVE_DOOR_LEAVES,...EXECUTIVE_FURNITURE].map(item=>({...item,room:null,x:executive.x-item.x,z:executive.z-item.z,rotation:(item.rotation||0)+Math.PI}));
-  const navigationBounds={...bounds,maxX:bounds.maxX+2.4};
-  return {bounds,navigationBounds,rooms,workSpots,furniture,seats,pods,boundaries,executive,park,landscape,circulation,regionAt,
-    blockers:[...furniture.filter(item=>item.type!=='chair'),...boundaries.walls,...executiveBlockers,...landscapeBlockers],
+  const navigationBounds={...bounds,maxX:bounds.maxX+2.4,maxZ:elevator.z+elevator.depth/2+2};
+  return {bounds,navigationBounds,perimeter,entrance,elevator,rooms,workSpots,furniture,seats,pods,boundaries,executive,park,landscape,circulation,regionAt,
+    blockers:[...furniture.filter(item=>item.type!=='chair'),...boundaries.walls,...perimeter,...sidelights,...executiveBlockers,...landscapeBlockers],
     isWalkable:({x,z},margin)=>{
       const point={x,z};
       if(park.beds.some(bed=>contains(point,bed,-margin)))return false;

@@ -42,12 +42,13 @@ function renderCounts(){
   $('#space-size').replaceChildren(document.createTextNode(`${width} × ${depth}`));const m=document.createElement('small');m.textContent='m';$('#space-size').append(m);
   for(const room of SHARED_ROOMS)$(`[data-room="${room.key}"]>span:last-child`).textContent=`${scene.actors.filter(a=>a.seat.room===room.key&&(!project||a.project.key===project)).length}명`;
   const shown=scene.actors.filter(a=>!project||a.project.key===project),waiting=shown.filter(a=>a.session&&!a.session.active&&!a.session.finished).length,resting=shown.filter(a=>a.session&&!a.session.active&&a.session.finished).length;
-  $('#stage-population').textContent=demo?`${shown.length}명 예시 배치`:`화면 ${shown.length}명 · 응답 대기 ${waiting}명 · 휴식 ${resting}명`;
+  $('#stage-population').textContent=scene.parkingView?'지하 1층 · 주차장':demo?`${shown.length}명 예시 배치`:`화면 ${shown.length}명 · 응답 대기 ${waiting}명 · 휴식 ${resting}명`;
   $('#live-summary').textContent=`전체 ${(latest?.sessions||[]).filter(s=>s.active).length}명 작업 중 · 화면에 ${scene.actors.length}명`;
   $('#last-updated').textContent=latest?`${timeText(latest.checkedAt)} 확인 · ${connection==='offline'?'마지막 수신 상태':'이 PC의 Codex 기록'}`:'연결을 기다리는 중';
   $('#tower-link').href=demo?'/?view=tower':towerUrl();
 }
 function refreshDetail(){
+  if(scene.parkingView){$('#session-detail').hidden=true;detail('B1 · 주차장 엘리베이터','공원 쪽 외벽 승강장에서 엘리베이터를 타고 1층 오피스로 바로 올라갈 수 있습니다.');return;}
   if(!demo&&!latest){detail('실제 작업을 불러오는 중입니다','Codex의 프로젝트와 직원 정보를 연결하고 있어요.');return;}
   if(scene.selectedOwner){$('#session-detail').hidden=true;detail(`${scene.executive.ownerName} · ${scene.executive.ownerTitle}`,scene.executive.patrol.text);return;}
   if(selectedSession){
@@ -66,7 +67,7 @@ function refreshDetail(){
   if(selectedRoom){const actors=scene.actors.filter(a=>a.seat.room===selectedRoom&&a.model.root.visible);detail(`${roomName(selectedRoom)} · ${actors.length}명`,selectedRoom==='meeting'?'계획 정리와 협업으로 분류된 작업을 프로젝트별 포드에 표시합니다.':'같은 종류의 업무를 하는 여러 프로젝트가 공간을 함께 사용합니다.');}
   else if(project){const p=projects.find(p=>p.key===project);detail(p?.name||'프로젝트',`${scene.actors.filter(a=>a.model.root.visible).length}명의 직원 위치를 보여줍니다. 프로젝트별 전체 최근 작업은 아래 목록에서 확인하세요.`);}
   else if(!demo&&!(latest?.sessions||[]).some(s=>s.active))detail('지금은 작업 중인 직원이 없어요',showResting?'쉬는 직원들과 최근 작업을 살펴볼 수 있습니다.':'새 작업이 시작되면 해당 업무 구역에 직원이 나타납니다.');
-  else detail('공용 통로와 앞마당 정원으로 연결된 오피스','고양이 말풍선을 누르면 고양이의 눈높이로 정원을 둘러볼 수 있어요.');
+  else detail('공용 통로와 앞마당 정원으로 연결된 오피스','휴식 정원 앞 외벽 엘리베이터로 지하 주차장과 바로 연결됩니다. 고양이 말풍선을 누르면 정원을 고양이 눈높이로 둘러볼 수 있어요.');
 }
 function renderRoster(){
   $('#live-roster').hidden=demo;if(demo)return;
@@ -79,7 +80,7 @@ function renderRoster(){
   }
   if(!sessions.length){const empty=document.createElement('p');empty.className='roster-empty';empty.textContent=latest?'이 조건에 맞는 최근 작업이 없어요.':'실제 작업을 불러오는 중입니다.';list.append(empty);}
 }
-function markRoom(key){const overviewSelected=!key&&!selectedSession&&!scene.selectedOwner&&!scene.catView;$('#overview').classList.toggle('selected',overviewSelected);$('#overview').setAttribute('aria-pressed',String(overviewSelected));$$('.room-row').forEach(b=>{const selected=b.dataset.room===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
+function markRoom(key){const overviewSelected=!key&&!selectedSession&&!scene.selectedOwner&&!scene.catView&&!scene.parkingView;$('#overview').classList.toggle('selected',overviewSelected);$('#overview').setAttribute('aria-pressed',String(overviewSelected));$$('.room-row').forEach(b=>{const selected=b.dataset.room===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
 function updateCatView(name){
   const exit=$('#exit-cat-view'),label=$('#cat-view-name');
   $('.study-stage').classList.toggle('cat-view',Boolean(name));
@@ -93,16 +94,26 @@ function updateCatView(name){
   markRoom(selectedRoom);refreshDetail();renderRoster();renderCounts();
   announce(name?`${name} 시점으로 전환했습니다`:'지도 시점으로 돌아왔습니다');
 }
-function overview(){selectedRoom=null;selectedSession=null;scene.resetView();markRoom(null);refreshDetail();renderRoster();renderCounts();}
-function chooseRoom(key){selectedRoom=key;selectedSession=null;scene.selectRoom(key);markRoom(key);refreshDetail();renderRoster();renderCounts();announce(`${roomName(key)} 확대`);}
-function chooseActor(id){selectedRoom=null;selectedSession=id;scene.selectActor(scene.actors.some(a=>a.id===id)?id:null);markRoom(null);refreshDetail();renderRoster();renderCounts();}
-function chooseOwner(){selectedRoom=null;selectedSession=null;scene.selectOwner();markRoom(null);refreshDetail();renderRoster();renderCounts();if(scene.selectedOwner)announce('CEO 확대');}
+function updateFloorView(parking){
+  $('.study-stage').classList.toggle('parking-view',parking);
+  for(const button of $$('[data-floor-view]')){
+    const selected=(button.dataset.floorView==='parking')===parking;
+    button.classList.toggle('selected',selected);
+    button.setAttribute('aria-pressed',String(selected));
+  }
+  markRoom(parking?null:selectedRoom);refreshDetail();renderCounts();
+  announce(parking?'지하 1층 주차장으로 전환했습니다.':'1층 공용 오피스로 돌아왔습니다.');
+}
+function overview(){scene.setParkingView(false);selectedRoom=null;selectedSession=null;scene.resetView();markRoom(null);refreshDetail();renderRoster();renderCounts();}
+function chooseRoom(key){scene.setParkingView(false);selectedRoom=key;selectedSession=null;scene.selectRoom(key);markRoom(key);refreshDetail();renderRoster();renderCounts();announce(`${roomName(key)} 확대`);}
+function chooseActor(id){scene.setParkingView(false);selectedRoom=null;selectedSession=id;scene.selectActor(scene.actors.some(a=>a.id===id)?id:null);markRoom(null);refreshDetail();renderRoster();renderCounts();}
+function chooseOwner(){scene.setParkingView(false);selectedRoom=null;selectedSession=null;scene.selectOwner();markRoom(null);refreshDetail();renderRoster();renderCounts();if(scene.selectedOwner)announce('CEO 확대');}
 function chooseProject(key){project=key;selectedSession=null;selectedRoom=null;scene.selectActor(null);scene.setProject(key);markRoom(null);renderProjects();renderCounts();refreshDetail();renderRoster();}
 function applyLive(){
   projects=sharedProjects(latest||{sessions:[],projects:[]},registry.floors||{});if(latest&&project&&!projects.some(p=>p.key===project))project=null;
   const population=occupancy.update(latest?.sessions||[],projects,showResting);scene.setLiveData(population);scene.setProject(project);
   renderProjects();renderCounts();refreshDetail();renderRoster();
-  if(selectedSession&&scene.actors.some(a=>a.id===selectedSession)&&!scene.selectedId)scene.selectActor(selectedSession);
+  if(!scene.parkingView&&selectedSession&&scene.actors.some(a=>a.id===selectedSession)&&!scene.selectedId)scene.selectActor(selectedSession);
 }
 function changeScenario(key){scenario=key;scene.project=project;scene.setScenario(key);$$('[data-scenario]').forEach(b=>{const selected=b.dataset.scenario===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});$('#scenario-description').textContent=`${SCENARIOS[key].name} · 예시 직원 ${scene.actors.length}명입니다.`;overview();}
 function toggleDemo(){
@@ -114,20 +125,51 @@ function toggleDemo(){
 
 let preferences={...DEFAULT_PREFERENCES,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches},settingsLoadError='';
 try{Object.assign(preferences,await loadPreferences());}catch(error){Object.assign(preferences,error.preferences||{});settingsLoadError=error.message;}
+let locationStatus='';
+function renderLocation(){
+  const detail=$('#location-detail');
+  const saved=Number.isFinite(preferences.latitude)&&Number.isFinite(preferences.longitude);
+  detail.textContent=locationStatus||(saved?'저장된 위치를 기준으로 해와 달을 계산합니다.':'위치가 없으면 기기의 시간대를 바탕으로 하늘을 표시합니다.');
+}
+function requestLocation(manual=false){
+  if(!navigator.geolocation){
+    locationStatus='이 브라우저에서는 현재 위치를 사용할 수 없어요.';
+    renderLocation();
+    return;
+  }
+  if(manual){locationStatus='현재 위치를 확인하는 중…';renderLocation();}
+  navigator.geolocation.getCurrentPosition(async ({coords:{latitude,longitude}})=>{
+    try{
+      if(latitude!==preferences.latitude||longitude!==preferences.longitude)applyPreferences(await savePreferences({latitude,longitude}));
+      locationStatus='현재 위치를 기준으로 해와 달을 계산합니다.';
+    }catch(error){
+      scene?.setLocation(latitude,longitude);
+      locationStatus='현재 위치를 적용했어요. '+error.message;
+    }
+    renderLocation();
+  },()=>{
+    if(manual){
+      locationStatus='현재 위치를 가져올 수 없어요. 브라우저에서 위치 권한을 확인해 주세요.';
+      renderLocation();
+    }
+  },{maximumAge:manual?0:300000,timeout:12000});
+}
 function applyPreferences(next){
   preferences={...next};document.body.classList.toggle('large-text',preferences.largeText);
   scene?.setPreferences(preferences);$('#motion-toggle').setAttribute('aria-pressed',String(preferences.motion));
+  renderLocation();
   if(scene)refreshDetail();
 }
-const officeSettings=mountOfficeSettings({getPreferences:()=>preferences,onApply:applyPreferences,loadError:settingsLoadError});
+const officeSettings=mountOfficeSettings({getPreferences:()=>preferences,onApply:applyPreferences,onLocation:()=>requestLocation(true),showEvening:false,loadError:settingsLoadError});
 $('#open-settings').addEventListener('click',()=>officeSettings.open());
 try{
   scene=new SharedOfficeScene($('#study-canvas'),{
-    onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,onCatView:updateCatView,onOwnerStatus:()=>{if(scene?.selectedOwner)refreshDetail();},preferences,
-    onView:({zoom,elevation})=>{$('#zoom-label').textContent=`${Math.round(zoom*100)}%`;$$('[data-angle]').forEach(b=>{const selected=Math.abs(Number(b.dataset.angle)-elevation)<4;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});},
+    onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,onCatView:updateCatView,onFloor:updateFloorView,onOwnerStatus:()=>{if(scene?.selectedOwner)refreshDetail();},preferences,
+    onView:({zoom,elevation,parking})=>{$('#zoom-label').textContent=`${Math.round(zoom*100)}%`;$$('[data-angle]').forEach(b=>{const selected=Math.abs(Number(parking?(b.dataset.parkingAngle||b.dataset.angle):b.dataset.angle)-elevation)<4;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});},
     onWalkEnd:()=>{if(demo){$('#walk-preview').setAttribute('aria-pressed','false');$('#walk-preview').lastChild.textContent=' 직원 동선 보기';}},
   });
   applyPreferences(preferences);
+  requestLocation();
   $('#motion-toggle').setAttribute('aria-pressed',String(scene.motion));$('#show-resting').checked=showResting;
   applyLive();
   feed=new OfficeLiveFeed({cachedRegistry:{staff:stored('office-staff-registry'),floors:stored('office-floor-registry')},onConnection:updateConnection,onSnapshot:(snapshot,nextRegistry)=>{
@@ -136,7 +178,7 @@ try{
     if(!demo&&nextSignature!==signature){signature=nextSignature;applyLive();}else if(!demo)renderCounts();
   }});
   feed.start();
-  $('#overview').addEventListener('click',overview);$('#reset-view').addEventListener('click',overview);$('#all-projects').addEventListener('click',()=>chooseProject(null));$('#source-switch').addEventListener('click',toggleDemo);$('#refresh-live').addEventListener('click',()=>feed.refresh());
+  $('#overview').addEventListener('click',overview);$('#reset-view').addEventListener('click',()=>scene.parkingView?scene.resetView():overview());$('#all-projects').addEventListener('click',()=>chooseProject(null));$('#source-switch').addEventListener('click',toggleDemo);$('#refresh-live').addEventListener('click',()=>feed.refresh());
   $('#exit-cat-view').addEventListener('click',()=>scene.leaveCatView());
   $('.study-stage').addEventListener('keydown',event=>{
     if(event.key!=='Escape'||!scene.catView)return;
@@ -147,7 +189,8 @@ try{
   $('#project-search').addEventListener('input',renderProjects);
   $('#show-resting').addEventListener('change',()=>{showResting=$('#show-resting').checked;try{localStorage.setItem('shared-office-show-resting',JSON.stringify(showResting));}catch{}applyLive();});
   $$('[data-scenario]').forEach(b=>b.addEventListener('click',()=>changeScenario(b.dataset.scenario)));
-  $$('[data-angle]').forEach(b=>b.addEventListener('click',()=>scene.setElevation(b.dataset.angle)));
+  $$('[data-floor-view]').forEach(b=>b.addEventListener('click',()=>scene.setParkingView(b.dataset.floorView==='parking')));
+  $$('[data-angle]').forEach(b=>b.addEventListener('click',()=>scene.setElevation(scene.parkingView?(b.dataset.parkingAngle||b.dataset.angle):b.dataset.angle)));
   $$('[data-roster]').forEach(b=>b.addEventListener('click',()=>{rosterFilter=b.dataset.roster;$$('[data-roster]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));renderRoster();}));
   $('#close-session').addEventListener('click',()=>{selectedSession=null;scene.selectActor(null);refreshDetail();renderRoster();renderCounts();});
   $('#zoom-in').addEventListener('click',()=>scene.setZoom(scene.zoom*1.2));$('#zoom-out').addEventListener('click',()=>scene.setZoom(scene.zoom/1.2));

@@ -45,7 +45,7 @@ const fields=[
   ['visitor-baby-setting','visitorBaby','태명 / 아기 정보',40,'선택 입력'],
 ];
 function input(key){const [id,,label,length,placeholder]=fields.find(field=>field[1]===key);return `<label>${label}<input id="${id}" name="${key}" type="text" maxlength="${length}" placeholder="${placeholder}"></label>`;}
-export function mountOfficeSettings({getPreferences,onApply,onLocation,loadError=''}){
+export function mountOfficeSettings({getPreferences,onApply,onLocation,showEvening=Boolean(onLocation),loadError=''}){
   let dialog=document.querySelector('#settings-dialog');
   if(!dialog){dialog=document.createElement('dialog');dialog.id='settings-dialog';document.body.append(dialog);}
   dialog.className='office-settings-dialog';dialog.setAttribute('aria-labelledby','office-settings-title');
@@ -53,7 +53,7 @@ export function mountOfficeSettings({getPreferences,onApply,onLocation,loadError
     <fieldset><legend>CEO · 회장실</legend><div class="office-settings-grid">${['executiveSuiteName','ownerName','ownerTitle','ownerRank'].map(input).join('')}</div></fieldset>
     <fieldset><legend>비서</legend>${input('secretaryName')}</fieldset>
     <fieldset><legend>임산부</legend><label class="office-settings-check"><input id="visitor-enabled-setting" name="visitorEnabled" type="checkbox">오피스에 임산부 캐릭터 표시</label><div class="office-settings-grid">${['visitorName','visitorRole','visitorBaby'].map(input).join('')}<label>출산 예정일<input id="visitor-due-date-setting" name="visitorDueDate" type="date" min="1900-01-01" max="2199-12-31"></label></div><p class="office-settings-note">출산 예정일을 입력하면 캐릭터의 임신 주수와 모습을 계산해 표시합니다.</p></fieldset>
-    <fieldset><legend>화면</legend><label class="office-settings-check"><input id="motion-setting" name="motion" type="checkbox">캐릭터 움직임</label><label class="office-settings-check"><input id="text-setting" name="largeText" type="checkbox">더 큰 글자</label>${onLocation?'<label class="office-settings-check"><input id="theme-setting" name="evening" type="checkbox">조용한 저녁 테마</label>':''}</fieldset>
+    <fieldset><legend>화면</legend><label class="office-settings-check"><input id="motion-setting" name="motion" type="checkbox">캐릭터 움직임</label><label class="office-settings-check"><input id="text-setting" name="largeText" type="checkbox">더 큰 글자</label>${showEvening?'<label class="office-settings-check"><input id="theme-setting" name="evening" type="checkbox">조용한 저녁 테마</label>':''}</fieldset>
     ${onLocation?'<fieldset><legend>사무실 위치</legend><p id="location-detail" class="office-settings-note"></p><button id="location-update" class="settings-secondary" type="button">현재 위치 설정·갱신</button></fieldset>':''}
     <p class="office-settings-privacy">설정은 이 프로젝트의 <code>data/settings.json</code>에 저장됩니다. 사용자 입력 정보는 Git과 배포 ZIP에서 제외됩니다.</p><p id="settings-status" role="status" aria-live="polite"></p><div class="office-settings-footer"><button class="settings-secondary settings-cancel" type="button">닫기</button><button id="settings-save" class="settings-primary" type="submit">설정 저장</button></div></form>`;
   const form=dialog.querySelector('form'),status=dialog.querySelector('#settings-status'),submit=dialog.querySelector('#settings-save');

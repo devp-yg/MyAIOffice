@@ -28,12 +28,14 @@ export function followLabelAnchor(anchor,size,viewport,previousBox,previousAncho
 
 export function projectHead(model,camera,width,height){
   model.head.updateWorldMatrix(true,false);
-  const point=model.head.localToWorld(new THREE.Vector3(0,.44,0)).project(camera);
+  const point=model.head.localToWorld(new THREE.Vector3(0,.44,0)).applyMatrix4(camera.matrixWorldInverse);
+  const verticalSpan=camera.isPerspectiveCamera?-2*point.z/camera.projectionMatrix.elements[5]:camera.top-camera.bottom;
+  point.applyMatrix4(camera.projectionMatrix);
   const scale=model.head.getWorldScale(new THREE.Vector3());
   return {
     anchor:{x:(point.x+1)*width/2,y:(1-point.y)*height/2},
     visible:point.z>=-1&&point.z<=1&&Math.abs(point.x)<=1&&Math.abs(point.y)<=1,
-    headPixels:.7*Math.max(scale.x,scale.y,scale.z)*height/(camera.top-camera.bottom),
+    headPixels:.7*Math.max(scale.x,scale.y,scale.z)*height/verticalSpan,
   };
 }
 
@@ -70,13 +72,23 @@ export class SharedOfficeLabels {
     this.svg=document.createElementNS(SVG_NS,'svg');this.svg.classList.add('study-label-connectors');
     this.svg.setAttribute('aria-hidden','true');layer.prepend(this.svg);
   }
-  add(label,{model,working,alwaysFull=false,selected=()=>false,visible=()=>true,summary=()=> '☾ 휴식'}){
+  add(label,{model,name,working,showMetadata=()=>true,alwaysFull=false,selected=()=>false,visible=()=>true,summary=()=> '☾ 휴식'}){
     const group=document.createElementNS(SVG_NS,'g'),line=document.createElementNS(SVG_NS,'path'),dot=document.createElementNS(SVG_NS,'circle');
     dot.setAttribute('r','2.5');group.append(line,dot);this.svg.append(group);
     const brief=document.createElement('span');brief.className='study-agent-summary';label.append(brief);
+    const interactive=label.tagName==='BUTTON';
+    const nameplate=document.createElement(interactive?'button':'span');
+    nameplate.className='study-nameplate';
+    nameplate.hidden=true;
+    if(interactive){
+      nameplate.type='button';
+      nameplate.addEventListener('click',()=>label.click());
+      label.tabIndex=-1;
+    }
+    this.layer.append(nameplate);
     if(!label.style.getPropertyValue('--project'))label.style.setProperty('--project','#789063');
     label.classList.add('anchored');
-    const entry={label,model,working,alwaysFull,selected,visible,summary,group,line,dot,brief,detail:'compact',previous:-1,box:null,anchor:null,size:null,viewport:null,hover:false,focus:false};
+    const entry={label,model,name,nameplate,interactive,working,showMetadata,alwaysFull,selected,visible,summary,group,line,dot,brief,detail:'compact',previous:-1,box:null,anchor:null,size:null,viewport:null,hover:false,focus:false};
     entry.enter=()=>{entry.hover=true;};entry.leave=()=>{entry.hover=false;};
     entry.focusIn=()=>{entry.focus=true;};entry.focusOut=()=>{entry.focus=false;};
     label.addEventListener('pointerenter',entry.enter);label.addEventListener('pointerleave',entry.leave);
@@ -87,22 +99,37 @@ export class SharedOfficeLabels {
     const entry=this.entries.get(label);if(!entry)return;
     label.removeEventListener('pointerenter',entry.enter);label.removeEventListener('pointerleave',entry.leave);
     label.removeEventListener('focusin',entry.focusIn);label.removeEventListener('focusout',entry.focusOut);
-    entry.group.remove();entry.brief.remove();this.entries.delete(label);
+    entry.group.remove();entry.brief.remove();entry.nameplate.remove();this.entries.delete(label);
   }
   update(camera,width,height,showLabels){
-    const items=[];
+    const items=[],nameplates=[],worldPoint=new THREE.Vector3();
     for(const entry of this.entries.values()){
-      const {label}=entry,model=entry.model();
+      const {label,nameplate}=entry,model=entry.model();
       label.hidden=!showLabels||!entry.visible()||!model?.root.visible;
-      entry.group.style.display='none';if(label.hidden)continue;
+      entry.group.style.display='none';
+      if(label.hidden){nameplate.hidden=true;continue;}
+      const selected=entry.selected(),isWorking=entry.working();
+      const feet=model.root.getWorldPosition(worldPoint).project(camera);
+      nameplate.hidden=Math.abs(feet.x)>1||Math.abs(feet.y)>1||Math.abs(feet.z)>1;
+      if(!nameplate.hidden){
+        const name=entry.name();
+        if(nameplate.textContent!==name)nameplate.textContent=name;
+        nameplate.classList.toggle('selected',selected);
+        if(entry.interactive){
+          const description=label.getAttribute('aria-label')||name;
+          if(nameplate.getAttribute('aria-label')!==description)nameplate.setAttribute('aria-label',description);
+        }
+        nameplates.push({nameplate,x:(feet.x+1)*width/2,y:(1-feet.y)*height/2+5});
+      }
       // Updating parents first includes seats, body animation, scale and the
       // executive suite's parent transform before the renderer runs.
       const {anchor,visible,headPixels}=projectHead(model,camera,width,height);
       label.hidden=!visible;
       if(label.hidden)continue;
-      const selected=entry.selected(),engaged=entry.hover||entry.focus,isWorking=entry.working();
+      const engaged=entry.hover||entry.focus;
       entry.detail=labelDetail({working:isWorking,selected,alwaysFull:entry.alwaysFull,headPixels,previous:entry.detail});
       label.dataset.detail=entry.detail;label.dataset.working=String(isWorking);
+      label.dataset.metadata=String(entry.showMetadata());
       label.classList.toggle('engaged',engaged);
       const brief=entry.summary();if(entry.brief.textContent!==brief)entry.brief.textContent=brief;
       label.style.maxWidth=`${Math.max(1,Math.min(entry.detail==='compact'?175:isWorking||selected?260:220,width-16))}px`;
@@ -112,6 +139,16 @@ export class SharedOfficeLabels {
     // Read sizes together after updating presentation, avoiding a write/read
     // layout flush for every character.
     for(const item of items)item.size={w:item.entry.label.offsetWidth,h:item.entry.label.offsetHeight};
+    for(const item of nameplates){
+      item.w=item.nameplate.offsetWidth;
+      item.h=item.nameplate.offsetHeight;
+      item.x=clamp(item.x-item.w/2,2,Math.max(2,width-item.w-2));
+      item.y=Math.min(item.y,Math.max(0,height-item.h-2));
+    }
+    for(const {nameplate,x,y} of nameplates){
+      nameplate.style.left=`${x}px`;
+      nameplate.style.top=`${y}px`;
+    }
     const stable=[],moving=[];
     for(const item of items){
       const {entry,anchor,size,viewport}=item;
@@ -124,7 +161,7 @@ export class SharedOfficeLabels {
       const {entry,anchor,viewport}=item;
       item.box=followLabelAnchor(anchor,entry.size,viewport,entry.box,entry.anchor);
     }
-    const placed=stable.map(item=>item.box);
+    const placed=[...nameplates,...stable.map(item=>item.box)];
     moving.sort((a,b)=>b.priority-a.priority);
     for(const item of moving){
       const {entry,anchor,size,priority,viewport}=item;
