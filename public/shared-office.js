@@ -66,7 +66,7 @@ function refreshDetail(){
   if(selectedRoom){const actors=scene.actors.filter(a=>a.seat.room===selectedRoom&&a.model.root.visible);detail(`${roomName(selectedRoom)} · ${actors.length}명`,selectedRoom==='meeting'?'계획 정리와 협업으로 분류된 작업을 프로젝트별 포드에 표시합니다.':'같은 종류의 업무를 하는 여러 프로젝트가 공간을 함께 사용합니다.');}
   else if(project){const p=projects.find(p=>p.key===project);detail(p?.name||'프로젝트',`${scene.actors.filter(a=>a.model.root.visible).length}명의 직원 위치를 보여줍니다. 프로젝트별 전체 최근 작업은 아래 목록에서 확인하세요.`);}
   else if(!demo&&!(latest?.sessions||[]).some(s=>s.active))detail('지금은 작업 중인 직원이 없어요',showResting?'쉬는 직원들과 최근 작업을 살펴볼 수 있습니다.':'새 작업이 시작되면 해당 업무 구역에 직원이 나타납니다.');
-  else detail('공용 통로와 앞마당 정원으로 연결된 오피스','공간이나 직원을 눌러 가까이에서 살펴보세요.');
+  else detail('공용 통로와 앞마당 정원으로 연결된 오피스','고양이 말풍선을 누르면 고양이의 눈높이로 정원을 둘러볼 수 있어요.');
 }
 function renderRoster(){
   $('#live-roster').hidden=demo;if(demo)return;
@@ -79,7 +79,20 @@ function renderRoster(){
   }
   if(!sessions.length){const empty=document.createElement('p');empty.className='roster-empty';empty.textContent=latest?'이 조건에 맞는 최근 작업이 없어요.':'실제 작업을 불러오는 중입니다.';list.append(empty);}
 }
-function markRoom(key){$('#overview').classList.toggle('selected',!key&&!selectedSession&&!scene.selectedOwner);$('#overview').setAttribute('aria-pressed',String(!key&&!selectedSession&&!scene.selectedOwner));$$('.room-row').forEach(b=>{const selected=b.dataset.room===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
+function markRoom(key){const overviewSelected=!key&&!selectedSession&&!scene.selectedOwner&&!scene.catView;$('#overview').classList.toggle('selected',overviewSelected);$('#overview').setAttribute('aria-pressed',String(overviewSelected));$$('.room-row').forEach(b=>{const selected=b.dataset.room===key;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
+function updateCatView(name){
+  const exit=$('#exit-cat-view'),label=$('#cat-view-name');
+  $('.study-stage').classList.toggle('cat-view',Boolean(name));
+  const restoreFocus=!name&&document.activeElement===exit;
+  exit.hidden=label.hidden=!name;
+  label.textContent=name?`${name} 시점 · Esc로 돌아가기`:'';
+  if(name){
+    selectedRoom=selectedSession=null;
+    exit.focus({preventScroll:true});
+  }else if(restoreFocus)$('#study-canvas canvas').focus({preventScroll:true});
+  markRoom(selectedRoom);refreshDetail();renderRoster();renderCounts();
+  announce(name?`${name} 시점으로 전환했습니다`:'지도 시점으로 돌아왔습니다');
+}
 function overview(){selectedRoom=null;selectedSession=null;scene.resetView();markRoom(null);refreshDetail();renderRoster();renderCounts();}
 function chooseRoom(key){selectedRoom=key;selectedSession=null;scene.selectRoom(key);markRoom(key);refreshDetail();renderRoster();renderCounts();announce(`${roomName(key)} 확대`);}
 function chooseActor(id){selectedRoom=null;selectedSession=id;scene.selectActor(scene.actors.some(a=>a.id===id)?id:null);markRoom(null);refreshDetail();renderRoster();renderCounts();}
@@ -110,7 +123,7 @@ const officeSettings=mountOfficeSettings({getPreferences:()=>preferences,onApply
 $('#open-settings').addEventListener('click',()=>officeSettings.open());
 try{
   scene=new SharedOfficeScene($('#study-canvas'),{
-    onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,onOwnerStatus:()=>{if(scene?.selectedOwner)refreshDetail();},preferences,
+    onRoom:chooseRoom,onActor:chooseActor,onOwner:chooseOwner,onCatView:updateCatView,onOwnerStatus:()=>{if(scene?.selectedOwner)refreshDetail();},preferences,
     onView:({zoom,elevation})=>{$('#zoom-label').textContent=`${Math.round(zoom*100)}%`;$$('[data-angle]').forEach(b=>{const selected=Math.abs(Number(b.dataset.angle)-elevation)<4;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});},
     onWalkEnd:()=>{if(demo){$('#walk-preview').setAttribute('aria-pressed','false');$('#walk-preview').lastChild.textContent=' 직원 동선 보기';}},
   });
@@ -124,6 +137,13 @@ try{
   }});
   feed.start();
   $('#overview').addEventListener('click',overview);$('#reset-view').addEventListener('click',overview);$('#all-projects').addEventListener('click',()=>chooseProject(null));$('#source-switch').addEventListener('click',toggleDemo);$('#refresh-live').addEventListener('click',()=>feed.refresh());
+  $('#exit-cat-view').addEventListener('click',()=>scene.leaveCatView());
+  $('.study-stage').addEventListener('keydown',event=>{
+    if(event.key!=='Escape'||!scene.catView)return;
+    event.preventDefault();
+    event.stopPropagation();
+    scene.leaveCatView();
+  });
   $('#project-search').addEventListener('input',renderProjects);
   $('#show-resting').addEventListener('change',()=>{showResting=$('#show-resting').checked;try{localStorage.setItem('shared-office-show-resting',JSON.stringify(showResting));}catch{}applyLive();});
   $$('[data-scenario]').forEach(b=>b.addEventListener('click',()=>changeScenario(b.dataset.scenario)));

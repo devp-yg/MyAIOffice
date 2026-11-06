@@ -16,14 +16,14 @@ function sceneFor(Scene,{zoom=1,executive=false}={}){
     element:{clientWidth:1200,clientHeight:800,classList:{toggle(){}}},
     renderer:{setSize(){},domElement:{
       addEventListener(type,handler){handlers.set(type,handler);},
-      setPointerCapture(){},hasPointerCapture(){return false;},
+      setPointerCapture(){},hasPointerCapture(){return false;},setAttribute(){},
     }},
     camera:new THREE.OrthographicCamera(-20,20,12,-12,.1,180),
     angle:.48,elevation:.72,zoom,viewTarget:new THREE.Vector3(),
     navigator:{executive},updateLabels(){},
     layout:{bounds:{minX:-35,maxX:22,minZ:-16,maxZ:24}},
   });
-  OfficeScene.prototype.bindControls.call(view);
+  OfficeScene.prototype.bindControls.call(view,()=>!view.catView);
   view.resize();
   return {view,handlers};
 }
@@ -135,4 +135,51 @@ test('shared-office selection centres the rendered character after movement duri
   assert.equal(view.transition,null);
   assert.equal(model.selection.visible,true);
   assertCentred(view,body.localToWorld(new THREE.Vector3(0,.8,0)));
+});
+
+test('cat view follows the animated head and returns to the same map framing',t=>{
+  const {view,handlers}=sceneFor(SharedOfficeScene,{zoom:2});
+  const root=new THREE.Group(),head=new THREE.Group();
+  root.scale.set(.6,.7,.8);
+  root.add(head);head.position.set(0,.65,.35);
+  const model={
+    root,head,appearance:{name:'토양이'},action:'walk',
+    update(){root.position.set(3,.16,-4);root.rotation.y=Math.PI/2;head.rotation.x=.25;},
+  };
+  const cameras=[],views=[];
+  const label={dataset:{action:'walk'},classList:{remove(){},toggle(){}},setAttribute(){}};
+  Object.assign(view,{
+    catCamera:new THREE.PerspectiveCamera(65,1,.035,180),catLookTarget:new THREE.Vector3(),
+    cats:[{model,label}],labelLayer:{hidden:false},actors:[],roomMeshes:new Map(),
+    executive:{owner:{selection:{}},ownerLabel:label,floors:new Map(),update(){},patrol:{},spouseTargets(){}},
+    visitor:{update(){}},updateLighting(){},onCatView:name=>views.push(name),
+    lastTime:performance.now(),renderer:{...view.renderer,render(_scene,camera){cameras.push(camera);}},
+  });
+  t.after(()=>{delete globalThis.document;delete globalThis.requestAnimationFrame;});
+  globalThis.document={hidden:false};
+  globalThis.requestAnimationFrame=()=>1;
+
+  const mapPosition=view.camera.position.clone(),mapAngle=view.angle;
+  view.selectCat(model);
+  const initialEye=view.catCamera.position.clone();
+  handlers.get('keydown')({key:'ArrowRight',preventDefault(){}});
+  view.frame(view.lastTime+16);
+
+  assert.equal(view.labelLayer.hidden,true);
+  assert.equal(cameras.at(-1),view.catCamera);
+  assert.notDeepEqual(view.catCamera.position,initialEye);
+  const eye=head.localToWorld(new THREE.Vector3(0,.015,.31));
+  const forward=head.localToWorld(new THREE.Vector3(0,.015,1.31)).sub(eye).normalize();
+  assert.ok(view.catCamera.position.distanceTo(eye)<1e-9);
+  assert.ok(view.catCamera.getWorldDirection(new THREE.Vector3()).distanceTo(forward)<1e-9);
+  view.element.clientWidth=480;view.resize();
+  assert.equal(view.catCamera.aspect,480/800);
+
+  view.leaveCatView();
+  view.frame(view.lastTime+16);
+  assert.equal(cameras.at(-1),view.camera);
+  assert.equal(view.labelLayer.hidden,false);
+  assert.equal(view.angle,mapAngle);
+  assert.deepEqual(view.camera.position,mapPosition);
+  assert.deepEqual(views,['토양이',null]);
 });
