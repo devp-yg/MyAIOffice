@@ -14,7 +14,7 @@ let showResting=stored('shared-office-show-resting',true),rememberedProject=proj
 const announce=text=>{$('#study-announcement').textContent=text;};
 const countText=(element,value,unit)=>{element.replaceChildren(document.createTextNode(String(value)));const small=document.createElement('small');small.textContent=unit;element.append(small);};
 const roomName=key=>key==='executive'?'CEO 집무실':SHARED_ROOMS.find(r=>r.key===key)?.name||'업무 공간';
-const inactiveStatus=session=>session.finished?'작업 완료 · 휴식 중':'응답 대기 중';
+const inactiveStatus=session=>session.aborted?'작업 중단 · 휴식 중':session.finished?'작업 완료 · 휴식 중':'응답 대기 중';
 const timeText=timestamp=>timestamp?new Intl.DateTimeFormat('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(timestamp)):'—';
 function towerUrl(key=project,id=selectedSession){const params=new URLSearchParams({view:'tower'});if(key)params.set('project',key);if(id)params.set('session',id);return '/?'+params;}
 function detail(title,text){$('#study-detail strong').textContent=title;$('#study-detail p').textContent=text;}
@@ -64,7 +64,7 @@ function refreshDetail(){
   }
   $('#session-detail').hidden=true;
   if(selectedRoom==='executive'){detail('CEO 집무실 · 전용 공간','타워형의 집무실·비서실·접견실·이사회실·서재·프라이빗 라운지·기밀문서실을 같은 크기로 옮겼습니다.');return;}
-  if(selectedRoom){const actors=scene.actors.filter(a=>a.seat.room===selectedRoom&&a.model.root.visible);detail(`${roomName(selectedRoom)} · ${actors.length}명`,selectedRoom==='meeting'?'계획 정리와 협업으로 분류된 작업을 프로젝트별 포드에 표시합니다.':'같은 종류의 업무를 하는 여러 프로젝트가 공간을 함께 사용합니다.');}
+  if(selectedRoom){const actors=scene.actors.filter(a=>a.seat.room===selectedRoom&&a.model.root.visible);detail(`${roomName(selectedRoom)} · ${actors.length}명`,selectedRoom==='meeting'?'검토, 계획 정리, 서브에이전트 협업을 위한 공간입니다. 같은 프로젝트끼리 테이블을 배정합니다.':'같은 종류의 업무를 하는 여러 프로젝트가 공간을 함께 사용합니다.');}
   else if(project){const p=projects.find(p=>p.key===project);detail(p?.name||'프로젝트',`${scene.actors.filter(a=>a.model.root.visible).length}명의 직원 위치를 보여줍니다. 프로젝트별 전체 최근 작업은 아래 목록에서 확인하세요.`);}
   else if(!demo&&!(latest?.sessions||[]).some(s=>s.active))detail('지금은 작업 중인 직원이 없어요',showResting?'쉬는 직원들과 최근 작업을 살펴볼 수 있습니다.':'새 작업이 시작되면 해당 업무 구역에 직원이 나타납니다.');
   else detail('공용 통로와 앞마당 정원으로 연결된 오피스','휴식 정원 앞 외벽 엘리베이터로 지하 주차장과 바로 연결됩니다. 고양이 말풍선을 누르면 정원을 고양이 눈높이로 둘러볼 수 있어요.');
@@ -76,7 +76,7 @@ function renderRoster(){
   const list=$('#session-list');list.replaceChildren();
   for(const session of sessions){
     const p=projects.find(p=>p.key===session.projectKey),button=document.createElement('button');button.className='session-card';button.dataset.session=session.id;button.classList.toggle('selected',selectedSession===session.id);button.setAttribute('aria-pressed',String(selectedSession===session.id));
-    const dot=document.createElement('i'),copy=document.createElement('span'),name=document.createElement('strong'),task=document.createElement('small'),status=document.createElement('span');dot.style.background=p?.color||'#91a678';name.textContent=`${session.identity?.name||'Codex'} · ${p?.name||session.project}`;task.textContent=session.active?session.label:`${inactiveStatus(session)} · 마지막 활동 ${timeText(session.updatedAt)}`;status.textContent=session.error?'확인':session.active?'작업 중':session.finished?'완료':'응답 대기';status.className=session.error?'error':session.active?'active':'idle';copy.append(name,task);button.append(dot,copy,status);button.addEventListener('click',()=>chooseActor(session.id));list.append(button);
+    const dot=document.createElement('i'),copy=document.createElement('span'),name=document.createElement('strong'),task=document.createElement('small'),status=document.createElement('span');dot.style.background=p?.color||'#91a678';name.textContent=`${session.identity?.name||'Codex'} · ${p?.name||session.project}`;task.textContent=session.active?session.label:`${inactiveStatus(session)} · 마지막 활동 ${timeText(session.updatedAt)}`;status.textContent=session.error?'확인':session.active?'작업 중':session.aborted?'중단':session.finished?'완료':'응답 대기';status.className=session.error?'error':session.active?'active':'idle';copy.append(name,task);button.append(dot,copy,status);button.addEventListener('click',()=>chooseActor(session.id));list.append(button);
   }
   if(!sessions.length){const empty=document.createElement('p');empty.className='roster-empty';empty.textContent=latest?'이 조건에 맞는 최근 작업이 없어요.':'실제 작업을 불러오는 중입니다.';list.append(empty);}
 }

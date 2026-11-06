@@ -357,7 +357,7 @@ export class SharedOfficeScene {
       model:()=>actor.model,name:()=>actor.name,selected:()=>actor.id===this.selectedId,
       working:()=>!actor.departing&&(!actor.session||actor.session.active||actor.session.error||(actor.commandUntil||0)>performance.now()),
       showMetadata:()=>!actor.departing&&Boolean(actor.session?.active),
-      summary:()=>actor.departing?'↗ 퇴근':actor.session?.finished?'✓ 완료':actor.session&&!actor.session.active?'◷ 응답 대기':({nap:'☾ 낮잠',game:'◇ 게임',read:'▤ 독서',relax:'☕ 휴식',stretch:'↟ 스트레칭'}[actor.session?.identity?.idle]||'… 대기'),
+      summary:()=>actor.departing?'↗ 퇴근':actor.session?.aborted?'◷ 중단':actor.session?.finished?'✓ 완료':actor.session&&!actor.session.active?'◷ 응답 대기':({nap:'☾ 낮잠',game:'◇ 게임',read:'▤ 독서',relax:'☕ 휴식',stretch:'↟ 스트레칭'}[actor.session?.identity?.idle]||'… 대기'),
     });
     for(const [key,prop]of Object.entries(model.props))prop.visible=key===seat.mode;
     this.actors.push(actor);
@@ -369,7 +369,13 @@ export class SharedOfficeScene {
   }
   updateActorLabel(actor){
     const room=SHARED_ROOMS.find(r=>r.key===actor.seat.room).name,receiving=(actor.commandUntil||0)>performance.now();
-    const activity=receiving?'☎ CEO의 지시를 확인하는 중':actor.session?(actor.session.active?(actor.session.codexNote||actor.session.label||`${room}에서 작업 중`):actor.session.finished?'작업 완료 · 휴식 중':'응답 대기 중'):`${room}에서 함께 일하는 중`;
+    const session=actor.session;
+    let activity=`${room}에서 함께 일하는 중`;
+    if(receiving)activity='☎ CEO의 지시를 확인하는 중';
+    else if(session?.active){
+      const action=session.meetingIntent?session.label:session.codexNote||session.label;
+      activity=action||`${room}에서 작업 중`;
+    }else if(session)activity=session.aborted?'작업 중단 · 휴식 중':session.finished?'작업 완료 · 휴식 중':'응답 대기 중';
     const rank=actor.session?.hasParent?'서브에이전트':'메인 세션';
     const project=actor.project.name||actor.project.code;
     actor.label.querySelector('.study-agent-rank').textContent=rank;
