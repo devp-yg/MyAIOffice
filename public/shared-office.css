@@ -99,3 +99,21 @@ body.stage-expanded{overflow:hidden}.study-stage:fullscreen,.study-stage:-webkit
 .live-roster .session-detail p { color: #586b50; font-size: 13px; font-weight: 500; line-height: 1.6; }
 .live-roster .session-detail > a { color: #425d36; font-size: 13px; font-weight: 650; }
 .live-roster .roster-empty { color: #586b50; font-size: 14px; font-weight: 500; }
+
+.study-cat-label{
+  position:absolute;
+  transform:translate(-50%,-100%);
+  padding:1px 5px;
+  border:1px solid #d7cdb9;
+  border-radius:999px;
+  background:#fffaf1f2;
+  color:#58493b;
+  font-size:9px;
+  font-weight:650;
+  white-space:nowrap;
+}
+.study-cat-label[data-action="hiss"]{
+  color:#8b392d;
+  border-color:#d7a291;
+  background:#fff1e8;
+}
