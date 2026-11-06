@@ -8,6 +8,7 @@ import {daylightAt,sunriseSunset} from './solar-time.js';
 import {buildSharedGround} from './shared-office-ground.js';
 import {SharedOfficeLabels} from './shared-office-labels.js';
 import {OfficeVisitor} from './office-visitor.js';
+import {CourtyardCat} from './shared-office-cat.js';
 
 const materialCache=new Map();
 const DAY_BACKGROUND=new THREE.Color('#eef2ed'),NIGHT_BACKGROUND=new THREE.Color('#68747d');
@@ -72,7 +73,7 @@ export class SharedOfficeScene {
     this.world=new THREE.Group();this.scene.add(this.world);this.camera=new THREE.OrthographicCamera(-24,24,16,-16,.1,180);
     this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.shadowMap.autoUpdate=false;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
-    const canvas=this.renderer.domElement;canvas.setAttribute('aria-label','공용 오피스 3D 공간 시안. 드래그로 이동, Shift + 드래그로 회전, 스크롤로 확대하고 직원이나 업무 구역을 선택하세요.');canvas.setAttribute('role','img');element.append(canvas);
+    const canvas=this.renderer.domElement;canvas.setAttribute('aria-label','공용 오피스 3D 공간 시안. 마당 가장자리에는 검은 턱시도 고양이가 산책합니다. 드래그로 이동, Shift + 드래그로 회전, 스크롤로 확대하고 직원이나 업무 구역을 선택하세요.');canvas.setAttribute('role','img');element.append(canvas);
     this.sky=new THREE.HemisphereLight(0xfff9ed,0xb0bc9f,1.9);this.scene.add(this.sky);
     this.sun=new THREE.DirectionalLight(0xfff4dc,2.1);this.sun.position.set(-16,32,8);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);Object.assign(this.sun.shadow.camera,{left:-28,right:28,top:28,bottom:-28,near:1,far:80});this.sun.shadow.bias=-.0003;this.sun.shadow.normalBias=.03;this.sun.shadow.radius=4;this.scene.add(this.sun);
     this.angle=.48;this.elevation=.72;this.zoom=1;this.viewTarget=new THREE.Vector3(0,0,0);this.motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;this.showLabels=true;this.project=null;this.selectedId=null;this.selectedOwner=false;this.selectedRoom=null;this.actors=[];this.lights=[];
@@ -97,7 +98,7 @@ export class SharedOfficeScene {
   removeActor(actor){this.actorLabels.remove(actor.label);actor.model.root.removeFromParent();disposeCharacter(actor.model);actor.label.remove();actor.marker.geometry.dispose();actor.marker.material.dispose();actor.marker.removeFromParent();}
   rebuildLayout(layout){
     if(this.layoutGroup){
-      this.groundDesign?.dispose();this.layoutGroup.removeFromParent();for(const geometry of this.ownedGeometries||[])geometry.dispose();for(const material of this.ownedMaterials||[])material.dispose();
+      this.cat?.dispose();this.groundDesign?.dispose();this.layoutGroup.removeFromParent();for(const geometry of this.ownedGeometries||[])geometry.dispose();for(const material of this.ownedMaterials||[])material.dispose();
       for(const light of this.lights)light.mesh.material.dispose();
     }
     this.lights=[];this.ambientFixtures=[];this.layout=layout;this.navigator=new OfficeNavigator(this.layout);
@@ -165,6 +166,7 @@ export class SharedOfficeScene {
     const {minX,maxX,minZ,maxZ}=this.layout.bounds,width=maxX-minX,depth=maxZ-minZ,centerZ=(minZ+maxZ)/2;
     box(root,0xc3cab9,0,-.37,centerZ,width+.4,.6,depth+.4);const base=tile(root,roundedShape(minX,maxX,minZ,maxZ,.8),'#edf0e5',-.055);base.userData.base=true;
     this.groundDesign=buildSharedGround(root,this.layout);
+    this.cat=new CourtyardCat(root,this.layout.park.bounds[2]-.2);
     this.roomMeshes=new Map();
     for(const room of this.layout.rooms){
       const [x0,x1,z0,z1]=room.bounds,r=ROOM_CORNER_RADIUS;
@@ -333,11 +335,11 @@ export class SharedOfficeScene {
     this.frameHandle=requestAnimationFrame(this.frame);const dt=Math.min((time-this.lastTime)/1000,.05);this.lastTime=time;if(document.hidden)return;this.updateLighting(new Date());
     if(this.transition){const t=Math.min(1,(time-this.transition.start)/650),smooth=t*t*(3-2*t);this.viewTarget.lerpVectors(this.transition.from,this.transition.to,smooth);this.zoom=THREE.MathUtils.lerp(this.transition.zoomFrom,this.transition.zoomTo,smooth);this.resize();if(t===1)this.transition=null;}
     for(const actor of this.actors)this.updateActor(actor,dt,time);this.actors=this.actors.filter(actor=>!actor.departed);
-    this.executive.update(dt,time,this.motion,this.actors);
+    this.executive.update(dt,time,this.motion,this.actors);this.cat?.update(dt,time,this.motion);
     if(this.ownerStatusText!==this.executive.patrol.text){this.ownerStatusText=this.executive.patrol.text;this.onOwnerStatus?.();}
     this.visitor.update(this.navigator,dt,time,this.motion,true,this.executive.spouseTargets());
     if(this.live){const actor=this.showPaths!==false&&(this.actors.find(a=>a.id===this.selectedId&&a.walker.walking)||this.actors.find(a=>a.model.root.visible&&a.walker.walking)),signature=actor?`${actor.id}:${actor.walker.route.length}:${actor.walker.destination.x}:${actor.walker.destination.z}`:'';if(signature!==this.routeSignature){this.routeSignature=signature;if(actor)this.drawRoute(actor);else this.clearRoute();}}
     this.updateLabels();this.renderer.render(this.scene,this.camera);
   }
-  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();this.visitor.destroy(disposeCharacter);for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
+  destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();this.visitor.destroy(disposeCharacter);for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.cat?.dispose();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
 }
