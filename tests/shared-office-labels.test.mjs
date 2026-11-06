@@ -7,6 +7,7 @@ test('work and direct interaction retain full detail at every apparent size',()=
   for(const headPixels of [0,3,14,16,25,60]){
     assert.equal(labelDetail({working:true,headPixels}),'full');
     assert.equal(labelDetail({selected:true,headPixels}),'full');
+    assert.equal(labelDetail({alwaysFull:true,headPixels}),'full');
   }
   assert.equal(labelDetail({engaged:true,headPixels:0}),'compact');
   assert.equal(labelDetail({headPixels:10}),'compact');

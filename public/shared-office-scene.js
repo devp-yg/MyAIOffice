@@ -91,10 +91,10 @@ export class SharedOfficeScene {
     const entryLabel=document.createElement('div');entryLabel.className='study-entry-label';entryLabel.textContent='출퇴근 출입구';this.labelLayer.append(entryLabel);this.entryLabel=entryLabel;
     this.executive=new SharedExecutiveWing(this.world,this.labelLayer,{batch:batchStatic,onSelect:()=>this.onRoom?.('executive'),onOwnerSelect:()=>this.onOwner?.(),preferences});
     this.actorLabels=new SharedOfficeLabels(this.labelLayer);
-    this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),selected:()=>this.selectedOwner,summary:()=> '… 대기'});
+    this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),alwaysFull:true,selected:()=>this.selectedOwner});
     this.actorLabels.add(this.executive.secretaryLabel,{model:()=>this.executive.assisting?this.executive.companion:this.executive.secretary,working:()=>true});
     this.visitor=new OfficeVisitor(this.world,this.labelLayer,createCharacter,{shared:true,preferences});
-    this.actorLabels.add(this.visitor.label,{model:()=>this.visitor.model,working:()=>false,summary:()=>this.visitor.routine?.summary||'산책 준비'});
+    this.actorLabels.add(this.visitor.label,{model:()=>this.visitor.model,working:()=>false,alwaysFull:true});
     // Use the existing office camera gestures and keyboard controls.
     canvas.addEventListener('pointerdown',()=>{this.transition=null;});
     OfficeScene.prototype.bindControls.call(this,()=>!this.catView);

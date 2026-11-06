@@ -6,8 +6,8 @@ const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 // Use apparent head size, with hysteresis so zooming near the boundary does
 // not repeatedly expand and collapse idle labels. Work is never abbreviated;
 // hover only highlights, while selection deliberately opens the full bubble.
-export function labelDetail({working,selected,headPixels,previous='compact'}){
-  if(working||selected)return 'full';
+export function labelDetail({working,selected,alwaysFull,headPixels,previous='compact'}){
+  if(working||selected||alwaysFull)return 'full';
   return headPixels>=(previous==='full'?28:32)?'full':'compact';
 }
 
@@ -70,13 +70,13 @@ export class SharedOfficeLabels {
     this.svg=document.createElementNS(SVG_NS,'svg');this.svg.classList.add('study-label-connectors');
     this.svg.setAttribute('aria-hidden','true');layer.prepend(this.svg);
   }
-  add(label,{model,working,selected=()=>false,visible=()=>true,summary=()=> '☾ 휴식'}){
+  add(label,{model,working,alwaysFull=false,selected=()=>false,visible=()=>true,summary=()=> '☾ 휴식'}){
     const group=document.createElementNS(SVG_NS,'g'),line=document.createElementNS(SVG_NS,'path'),dot=document.createElementNS(SVG_NS,'circle');
     dot.setAttribute('r','2.5');group.append(line,dot);this.svg.append(group);
     const brief=document.createElement('span');brief.className='study-agent-summary';label.append(brief);
     if(!label.style.getPropertyValue('--project'))label.style.setProperty('--project','#789063');
     label.classList.add('anchored');
-    const entry={label,model,working,selected,visible,summary,group,line,dot,brief,detail:'compact',previous:-1,box:null,anchor:null,size:null,viewport:null,hover:false,focus:false};
+    const entry={label,model,working,alwaysFull,selected,visible,summary,group,line,dot,brief,detail:'compact',previous:-1,box:null,anchor:null,size:null,viewport:null,hover:false,focus:false};
     entry.enter=()=>{entry.hover=true;};entry.leave=()=>{entry.hover=false;};
     entry.focusIn=()=>{entry.focus=true;};entry.focusOut=()=>{entry.focus=false;};
     label.addEventListener('pointerenter',entry.enter);label.addEventListener('pointerleave',entry.leave);
@@ -101,7 +101,7 @@ export class SharedOfficeLabels {
       label.hidden=!visible;
       if(label.hidden)continue;
       const selected=entry.selected(),engaged=entry.hover||entry.focus,isWorking=entry.working();
-      entry.detail=labelDetail({working:isWorking,selected,headPixels,previous:entry.detail});
+      entry.detail=labelDetail({working:isWorking,selected,alwaysFull:entry.alwaysFull,headPixels,previous:entry.detail});
       label.dataset.detail=entry.detail;label.dataset.working=String(isWorking);
       label.classList.toggle('engaged',engaged);
       const brief=entry.summary();if(entry.brief.textContent!==brief)entry.brief.textContent=brief;

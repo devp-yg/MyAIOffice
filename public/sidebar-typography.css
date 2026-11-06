@@ -71,8 +71,10 @@
 
 /* Task text leads the bubble, while names and project tags stay compact. */
 .office-frame :is(.study-agent-label[data-detail=full], .world-agent-label.show-task) > strong { font-size: 13px; }
+.office-frame .world-agent-label.owner-label strong > .owner-label-name { font-size: inherit !important; }
 .office-frame .study-agent-label[data-detail=full] .study-agent-project,
-.office-frame .world-agent-label.show-task .agent-project { font-size: 10px; }
+.office-frame .world-agent-label.show-task .agent-project,
+.office-frame .world-agent-label.visitor-label .study-agent-project { font-size: 10px; }
 .office-frame .study-agent-label .study-agent-action,
 .office-frame .world-agent-label:is(.tower-agent-label, .librarian-label) > span,
 .office-frame .world-agent-label.visitor-label > .study-agent-action {
