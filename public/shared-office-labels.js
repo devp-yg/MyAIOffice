@@ -18,7 +18,12 @@ export function labelConnector(anchor,box){
 
 export function followLabelAnchor(anchor,size,viewport,previousBox,previousAnchor){
   const maxX=Math.max(8,viewport.width-size.w-8);
-  return {x:clamp(anchor.x+previousBox.x-previousAnchor.x,8,maxX),y:anchor.y+previousBox.y-previousAnchor.y,...size};
+  const maxY=Math.max(8,viewport.height-size.h-8);
+  return {
+    x:clamp(anchor.x+previousBox.x-previousAnchor.x,8,maxX),
+    y:clamp(anchor.y+previousBox.y-previousAnchor.y,8,maxY),
+    ...size,
+  };
 }
 
 export function projectHead(model,camera,width,height){
@@ -33,14 +38,19 @@ export function projectHead(model,camera,width,height){
 }
 
 export function placeLabel(anchor,size,viewport,placed=[],previous=-1){
-  const {w,h}=size,padding=8,gap=20,step=h+gap;
+  const {w,h}=size,padding=8,gap=16;
   const maxX=Math.max(padding,viewport.width-w-padding);
-  // Labels stay centered over their owner. Crowded labels stack vertically
-  // above the head instead of moving beside or below the employee.
-  const candidates=Array.from({length:12},(_,index)=>[0,-gap-index*step]);
+  const maxY=Math.max(padding,viewport.height-h-padding);
+  // Prefer directly above. A nearby side or the space below can fit a tall
+  // bubble near an edge or next to another character.
+  const candidates=[
+    [0,-h-gap],[0,-h-gap-42],[0,gap],
+    [-w/2-gap,-h/2],[w/2+gap,-h/2],
+    [-w*.35,-h-gap],[w*.35,-h-gap],
+  ];
   let best;
   candidates.forEach(([dx,dy],index)=>{
-    const box={x:clamp(anchor.x-w/2+dx,padding,maxX),y:anchor.y-h+dy,w,h};
+    const box={x:clamp(anchor.x-w/2+dx,padding,maxX),y:clamp(anchor.y+dy,padding,maxY),w,h};
     const connector=labelConnector(anchor,box),distance=Math.hypot(connector.x-anchor.x,connector.y-anchor.y);
     let overlap=0;
     for(const other of placed){
@@ -48,7 +58,7 @@ export function placeLabel(anchor,size,viewport,placed=[],previous=-1){
       const ih=Math.max(0,Math.min(box.y+h,other.y+other.h)-Math.max(box.y,other.y));
       overlap+=iw*ih/Math.max(1,Math.min(w*h,other.w*other.h));
     }
-    const score=overlap*300+distance+Math.hypot(dx,dy+12)*.18+(previous>=0&&index!==previous?12:0);
+    const score=overlap*300+distance+(index===0?0:8)+(previous>=0&&index!==previous?12:0);
     if(!best||score<best.score)best={box,index,score,connector};
   });
   return best;
@@ -95,7 +105,7 @@ export class SharedOfficeLabels {
       label.dataset.detail=entry.detail;label.dataset.working=String(isWorking);
       label.classList.toggle('engaged',engaged);
       const brief=entry.summary();if(entry.brief.textContent!==brief)entry.brief.textContent=brief;
-      label.style.maxWidth=`${Math.max(1,Math.min(entry.detail==='compact'?150:isWorking?220:170,width-16))}px`;
+      label.style.maxWidth=`${Math.max(1,Math.min(entry.detail==='compact'?175:isWorking||selected?260:220,width-16))}px`;
       label.style.maxHeight=`${Math.max(1,height-16)}px`;
       items.push({entry,anchor,priority:selected?3:isWorking?1:0,viewport:{width,height}});
     }
@@ -110,7 +120,11 @@ export class SharedOfficeLabels {
     }
     // Preserve each bubble's screen offset from its owner. Camera movement
     // carries labels along without repacking neighbours.
-    const placed=stable.map(item=>item.entry.box);
+    for(const item of stable){
+      const {entry,anchor,viewport}=item;
+      item.box=followLabelAnchor(anchor,entry.size,viewport,entry.box,entry.anchor);
+    }
+    const placed=stable.map(item=>item.box);
     moving.sort((a,b)=>b.priority-a.priority);
     for(const item of moving){
       const {entry,anchor,size,priority,viewport}=item;
@@ -123,9 +137,9 @@ export class SharedOfficeLabels {
       entry.dot.setAttribute('cx',anchor.x);entry.dot.setAttribute('cy',anchor.y);
       if(priority>=2)this.svg.append(entry.group);
     }
-    for(const {entry,anchor,priority}of stable){
-      const box=followLabelAnchor(anchor,entry.size,{width,height},entry.box,entry.anchor),connector=labelConnector(anchor,box);
-      entry.box=box;entry.anchor=anchor;entry.label.style.left=`${box.x}px`;entry.label.style.top=`${box.y}px`;
+    for(const {entry,anchor,priority,box}of stable){
+      const connector=labelConnector(anchor,box);
+      entry.label.style.left=`${box.x}px`;entry.label.style.top=`${box.y}px`;
       entry.group.style.display='';entry.group.style.setProperty('--project',entry.label.style.getPropertyValue('--project')||'#789063');
       entry.group.classList.toggle('highlighted',priority>=2);
       entry.line.setAttribute('d',`M ${connector.x} ${connector.y} L ${connector.endX} ${connector.endY}`);

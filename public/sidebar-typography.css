@@ -1,32 +1,32 @@
 /* Keep navigation readable in both office views. */
-:root :is(.study-sidebar, .building-dock) h2 { font-size: 17px; font-weight: 750; }
+:root :is(.study-sidebar, .building-dock) h2 { font-size: 19px; font-weight: 750; }
 :root :is(.study-sidebar, .building-dock) .section-label,
-:root .building-dock .building-title .overline { font-size: 10px; font-weight: 600; }
+:root .building-dock .building-title .overline { font-size: 11px; font-weight: 600; }
 :root :is(.study-sidebar, .building-dock) .overview-button,
 :root :is(.study-sidebar, .building-dock) .room-row,
 :root .building-dock .space-title h3,
-:root body.large-text .building-dock .space-title h3 { font-size: 14px; font-weight: 700; }
+:root body.large-text .building-dock .space-title h3 { font-size: 16px; font-weight: 700; }
 :root :is(.study-sidebar, .building-dock) .overview-button,
 :root :is(.study-sidebar, .building-dock) .room-row,
 :root .building-dock .space-button { min-height: 42px; }
 :root :is(.study-sidebar, .building-dock) .room-row > span:last-child,
-:root .building-dock .space-title .room-population { color: #718363; font-size: 12px; font-weight: 650; white-space: nowrap; }
-:root :is(.study-sidebar, .building-dock) .project-pill { min-height: 38px; padding: 8px; font-size: 13px; font-weight: 650; }
+:root .building-dock .space-title .room-population { color: #718363; font-size: 13px; font-weight: 650; white-space: nowrap; }
+:root :is(.study-sidebar, .building-dock) .project-pill { min-height: 38px; padding: 8px; font-size: 14px; font-weight: 650; }
 :root :is(.study-sidebar, .building-dock) .project-list { max-height: 222px; }
-:root :is(.study-sidebar, .building-dock) .text-button { font-size: 12px; font-weight: 650; }
-:root :is(.study-sidebar, .building-dock) #project-search { font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1.5; padding: 9px 10px; }
+:root :is(.study-sidebar, .building-dock) .text-button { font-size: 13px; font-weight: 650; }
+:root :is(.study-sidebar, .building-dock) #project-search { font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.5; padding: 9px 10px; }
 :root :is(.study-sidebar, .building-dock) #project-search::placeholder { color: #7f8b73; opacity: 1; }
 :root :is(.study-sidebar, .building-dock) p,
 :root :is(.study-sidebar, .building-dock) .resting-option,
 :root :is(.study-sidebar, .building-dock) #last-updated,
-:root .building-dock .tower-local-note strong { font-size: 12px; font-weight: 500; line-height: 1.7; }
+:root .building-dock .tower-local-note strong { font-size: 13px; font-weight: 500; line-height: 1.7; }
 :root :is(.study-sidebar, .building-dock) .project-section p,
 :root :is(.study-sidebar, .building-dock) .occupancy-section > p,
 :root :is(.study-sidebar, .building-dock) #last-updated,
 :root .building-dock .tower-local-note p { color: #718363; }
-:root :is(.study-sidebar, .building-dock) .preview-note strong { font-size: 12px; font-weight: 700; }
-:root .building-dock .floor-project strong { font-size: 13px; font-weight: 700; }
-:root .building-dock .floor-project small { font-size: 11px; font-weight: 500; }
+:root :is(.study-sidebar, .building-dock) .preview-note strong { font-size: 13px; font-weight: 700; }
+:root .building-dock .floor-project strong { font-size: 14px; font-weight: 700; }
+:root .building-dock .floor-project small { font-size: 12px; font-weight: 500; }
 
 /* Give larger navigation text enough room without shrinking the scene on phones. */
 :root .study-workspace, :root .office-workspace { grid-template-columns: 280px minmax(0, 1fr); }
@@ -40,4 +40,64 @@
   :root .study-sidebar { grid-template-columns: minmax(0, 1fr); }
   :root .study-sidebar .project-section { border-top: 1px solid var(--line); padding-top: 20px; }
   :root .building-dock .room-index { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Both views share the same type sizes for controls, lists, and activity. */
+.office-frame {
+  --stage-hud-font: 13px;
+  --task-font-size: 13px;
+  font-size: 15px;
+}
+.office-frame.large-text { --task-font-size: 15px; }
+.office-frame .office-intro h1 { font-size: 30px; }
+.office-frame .office-intro .intro,
+.office-frame .office-metrics small { font-size: 14px; }
+.office-frame .office-metrics strong { font-size: 27px; }
+.office-frame .office-metrics > div > span,
+.office-frame :is(.office-view-switch, .source-switch, .open-office-settings) { font-size: 12px; }
+.office-frame .connection-status { font-size: 13px; }
+.office-frame :is(.walk-button, #labels-toggle, #motion-toggle) { font-size: 12px; }
+.office-frame :is(.stage-bottom, .office-footer, .stage-scale, #layout-indicator, #zoom-label) { font-size: 11px; }
+.tower-office :is(.office-hint, .scene-caption > span:last-child, .floor-title strong) { font-size: 13px; }
+.office-frame :is(.office-roster, .activity-panel) h2 { font-size: 16px; }
+.office-frame :is(.session-card, .team-member) strong { font-size: 14px; }
+.office-frame :is(.session-card, .team-member) small,
+.office-frame :is(.roster-heading p, .roster-heading button, .team-tabs button, .activity-caption) { font-size: 12px; }
+.office-frame .office-settings-dialog :is(label, .office-settings-note, .office-settings-privacy) { font-size: 14px; }
+.office-frame .office-settings-dialog legend { font-size: 16px; }
+.office-frame :is(.study-cat-label, .study-agent-label[data-detail=compact] strong, .study-agent-label[data-detail=compact] .study-agent-summary) { font-size: 11px; }
+.office-frame .study-room-label strong { font-size: 13px; }
+.office-frame .world-room-label { font-size: 15px; }
+
+/* Task text leads the bubble, while names and project tags stay compact. */
+.office-frame :is(.study-agent-label[data-detail=full], .world-agent-label.show-task) > strong { font-size: 13px; }
+.office-frame .study-agent-label[data-detail=full] .study-agent-project,
+.office-frame .world-agent-label.show-task .agent-project { font-size: 10px; }
+.office-frame .study-agent-label .study-agent-action,
+.office-frame .world-agent-label:is(.tower-agent-label, .librarian-label) > span,
+.office-frame .world-agent-label.visitor-label > .study-agent-action {
+  color: #354b36;
+  font-size: var(--task-font-size);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.office-frame .study-agent-label.selected .study-agent-action { color: #fff; }
+.office-frame .world-agent-label:is(.owner-label, .secretary-label) > :is(.owner-label-action, .secretary-action) {
+  font-size: var(--task-font-size) !important;
+  font-weight: 600;
+  line-height: 1.4 !important;
+}
+.office-frame .world-agent-label:is(.tower-agent-label, .librarian-label, .owner-label, .secretary-label, .visitor-label) {
+  max-width: min(260px, calc(100% - 16px));
+  max-height: calc(100% - 90px);
+  overflow: auto;
+}
+.office-frame .world-agent-label > :is(span, .owner-label-action, .secretary-action) { max-width: 100%; }
+
+@media (max-width: 720px) {
+  .office-frame .office-intro h1 { font-size: 27px; }
+  .office-frame .office-metrics strong { font-size: 23px; }
+  .office-frame :is(.office-view-switch, .source-switch, .connection-status, .open-office-settings) { font-size: 11px; }
+  .office-frame :is(#labels-toggle, #motion-toggle) { padding-inline: 5px; }
 }
