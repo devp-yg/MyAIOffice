@@ -11,7 +11,7 @@ const EXECUTIVE_ROOM_NAMES={library:'서재 · 기록실',studio:'비서실',ser
 // The tower interior and secretary routine run in their original coordinates.
 // A single parent transform places the entire suite in the shared office.
 export class SharedExecutiveWing {
-  constructor(world,labelLayer,{batch,onSelect,onOwnerSelect,preferences={}}={}){
+  constructor(world,labelLayer,{batch,onSelect,onOwnerSelect,onSecretarySelect,preferences={}}={}){
     this.world=world;this.labelLayer=labelLayer;this.root=new THREE.Group();world.add(this.root);this.floors=new Map();
     buildExecutiveSuite(this.root,this.floors);
     for(const floor of this.floors.values())floor.userData.room='executive';
@@ -42,7 +42,7 @@ export class SharedExecutiveWing {
     this.ownerName=String(preferences.ownerName||'').trim()||'회장님';this.secretaryName=String(preferences.secretaryName||'').trim()||'비서';
     this.ownerTitle=preferences.ownerTitle||'CEO';
     this.ownerLabel=this.personLabel(this.ownerName,this.ownerTitle,this.patrol.text,'owner',onOwnerSelect);
-    this.secretaryLabel=this.personLabel(this.secretaryName,'비서',this.routine.text,'secretary');
+    this.secretaryLabel=this.personLabel(this.secretaryName,'비서',this.routine.text,'secretary',onSecretarySelect);
     this.setPreferences(preferences);
   }
   setPreferences(preferences){
@@ -55,9 +55,9 @@ export class SharedExecutiveWing {
     this.secretaryLabel.setAttribute('aria-label',`${this.secretaryName} · 비서 · ${this.routine.text}`);
   }
   personLabel(name,role,activity,kind,onSelect){
-    const label=document.createElement(kind==='owner'?'button':'div');label.className=`study-agent-label study-executive-person ${kind}`;
+    const label=document.createElement(kind==='owner'||kind==='secretary'?'button':'div');if(label.tagName==='BUTTON')label.type='button';label.className=`study-agent-label study-executive-person ${kind}`;
     const nameLine=document.createElement('strong'),nameText=document.createElement('span'),roleLine=document.createElement('small'),actionLine=document.createElement('span');
-    nameText.textContent=name;roleLine.textContent=role;roleLine.className='study-agent-rank';nameLine.append(nameText,roleLine);actionLine.textContent=activity;actionLine.className='study-agent-action';label.append(nameLine,actionLine);label.setAttribute('aria-label',`${name} · ${role} · ${activity}`);if(kind==='owner'){label.setAttribute('aria-pressed','false');label.addEventListener('click',()=>onSelect?.());}this.labelLayer.append(label);return label;
+    nameText.textContent=name;roleLine.textContent=role;roleLine.className='study-agent-rank';nameLine.append(nameText,roleLine);actionLine.textContent=activity;actionLine.className='study-agent-action';label.append(nameLine,actionLine);label.setAttribute('aria-label',`${name} · ${role} · ${activity}`);if(kind==='owner'){label.setAttribute('aria-pressed','false');label.addEventListener('click',()=>onSelect?.());}if(kind==='secretary')label.addEventListener('click',()=>onSelect?.());this.labelLayer.append(label);return label;
   }
   place(layout,navigator){
     this.layout=layout;this.root.position.set(layout.x,0,layout.z);this.root.rotation.y=layout.rotation;this.root.updateMatrixWorld(true);
@@ -73,8 +73,8 @@ export class SharedExecutiveWing {
   update(dt,time,motion,actors=[]){
     const today=secretaryLookForDate();
     if(today.day!==this.secretaryLook.day){
-      const old=this.secretary,wasVisible=old.root.visible;old.root.removeFromParent();disposeCharacter(old);this.secretary=createCharacter(this.root,'studio',{index:2,accessory:'glasses',secretary:true,secretaryOutfit:today.look});this.secretary.root.scale.setScalar(1.08);this.secretary.root.visible=wasVisible;this.secretary.root.traverse(node=>{if(node.isMesh)node.castShadow=false;});
-      const oldCompanion=this.companion,companionPosition=oldCompanion.root.position.clone();oldCompanion.root.removeFromParent();disposeCharacter(oldCompanion);this.companion=createCharacter(this.world,'studio',{index:2,accessory:'glasses',secretary:true,secretaryOutfit:today.look});this.companion.root.scale.setScalar(1.08);this.companion.root.visible=this.assisting;this.companion.root.position.copy(companionPosition);this.companion.root.traverse(node=>{if(node.isMesh)node.castShadow=false;});this.secretaryLook=today;
+      const old=this.secretary,wasVisible=old.root.visible;old.root.removeFromParent();disposeCharacter(old);this.secretary=createCharacter(this.root,'studio',{index:2,accessory:'glasses',secretary:true,secretaryOutfit:today.look});this.secretary.root.userData.ambientCharacter='secretary';this.secretary.root.scale.setScalar(1.08);this.secretary.root.visible=wasVisible;this.secretary.root.traverse(node=>{if(node.isMesh)node.castShadow=false;});
+      const oldCompanion=this.companion,companionPosition=oldCompanion.root.position.clone();oldCompanion.root.removeFromParent();disposeCharacter(oldCompanion);this.companion=createCharacter(this.world,'studio',{index:2,accessory:'glasses',secretary:true,secretaryOutfit:today.look});this.companion.root.userData.ambientCharacter='secretary';this.companion.root.scale.setScalar(1.08);this.companion.root.visible=this.assisting;this.companion.root.position.copy(companionPosition);this.companion.root.traverse(node=>{if(node.isMesh)node.castShadow=false;});this.secretaryLook=today;
     }
     this.updateOwner(dt,time,motion,actors);
     const routine=this.routine,model=this.secretary;

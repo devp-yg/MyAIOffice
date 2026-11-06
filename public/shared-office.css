@@ -127,3 +127,8 @@ body.stage-expanded{overflow:hidden}.study-stage:fullscreen,.study-stage:-webkit
   padding:2px 7px;
   font-weight:650;
 }
+.study-agent-label.visitor-label.selected{background:#a85f7e;border-color:#8e4968;color:#fff;box-shadow:0 3px 14px #81566c55;z-index:6}
+.study-agent-label.visitor-label.selected .study-agent-project,.study-agent-label.visitor-label.selected .study-agent-action{color:#fff}
+.study-executive-person.secretary.selected{background:#536a5b!important;border-color:#3f5647!important;color:#fffbed!important;box-shadow:0 0 0 2px #536a5b55,0 4px 12px #263a2840!important;z-index:8}
+.study-executive-person.secretary.selected>strong,.study-executive-person.secretary.selected>strong>span,.study-executive-person.secretary.selected>small,.study-executive-person.secretary.selected .study-agent-action{color:#fffbed!important}
+.study-executive-person.secretary.selected .study-agent-rank{background:#ffffff2b!important;color:#fff!important}

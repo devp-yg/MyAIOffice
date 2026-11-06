@@ -224,9 +224,10 @@ export class SpouseWatch {
 export class OfficeVisitor {
   constructor(world,labelLayer,createCharacter,{shared=false,preferences=DEFAULT_PREFERENCES}={}){
     this.model=createCharacter(world,'meeting',{index:7,pregnant:true,accessory:'none'});
-    this.label=document.createElement('div');
+    this.label=document.createElement('button');
+    this.label.type='button';
     this.label.className=shared?'study-agent-label visitor-label':'world-agent-label visitor-label show-task';
-    this.label.style.setProperty('--project','#b77f96');this.label.style.pointerEvents='none';
+    this.label.style.setProperty('--project','#b77f96');
     this.title=document.createElement('strong');
     const role=document.createElement('small');role.className='study-agent-project';this.role=role;
     this.action=document.createElement('span');this.action.className='study-agent-action';
