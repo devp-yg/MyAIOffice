@@ -2,7 +2,8 @@ import * as THREE from './vendor/three/three.module.js';
 import {beginCameraOrbit,characterFocusPoint} from './office-camera.js';
 import {OfficeScene,createCharacter,disposeCharacter,furniture} from './office-scene.js';
 import {OfficeNavigator,OfficeWalker} from './office-navigation.js';
-import {SHARED_ROOMS,ROOM_CORNER_RADIUS,ZONE_BOUNDARY_STYLES,createSharedLayout,createPreviewAssignments} from './shared-office-layout.js';
+import {SHARED_ROOMS,ROOM_CORNER_RADIUS,ZONE_BOUNDARY_STYLES,createSharedLayout,createPreviewAssignments} from './shared-office-layout.js?v=20261107-3';
+import {buildWoodenSign} from './office-room-signs.js';
 import {SharedExecutiveWing} from './shared-office-executive.js';
 import {celestialAt} from './office-celestial.js';
 import {SharedOfficeSky} from './shared-office-sky.js';
@@ -89,14 +90,11 @@ export class SharedOfficeScene {
     this.sky=new THREE.HemisphereLight(0xfff9ed,0xb0bc9f,1.9);this.scene.add(this.sky);
     this.sun=new THREE.DirectionalLight(0xfff4dc,2.1);this.sun.position.set(-16,32,8);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);Object.assign(this.sun.shadow.camera,{left:-28,right:28,top:28,bottom:-28,near:1,far:80});this.sun.shadow.bias=-.0003;this.sun.shadow.normalBias=.03;this.sun.shadow.radius=4;this.scene.add(this.sun,this.sun.target);
     this.angle=.48;this.elevation=MAP_ELEVATION;this.zoom=1;this.viewTarget=new THREE.Vector3(0,0,0);this.motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;this.showLabels=true;this.project=null;this.selectedId=null;this.selectedOwner=false;this.selectedAmbient=null;this.selectedRoom=null;this.actors=[];this.lights=[];
-    this.labelLayer=document.createElement('div');this.labelLayer.className='study-labels';element.append(this.labelLayer);this.roomLabels=new Map();
+    this.labelLayer=document.createElement('div');this.labelLayer.className='study-labels';element.append(this.labelLayer);
     this.cats=[];
-    for(const room of SHARED_ROOMS){
-      const label=document.createElement('button');label.className='study-room-label';label.style.setProperty('--room-color',room.color);const name=document.createElement('strong');name.textContent=room.name;const count=document.createElement('span');label.append(name,count);label.addEventListener('click',()=>this.onRoom?.(room.key));this.labelLayer.append(label);this.roomLabels.set(room.key,{node:label,point:new THREE.Vector3(...room.label)});
-    }
-    const gardenLabel=document.createElement('div');gardenLabel.className='study-garden-label';gardenLabel.textContent='COURTYARD · 정원';this.labelLayer.append(gardenLabel);this.gardenLabel=gardenLabel;
-    const entryLabel=document.createElement('div');entryLabel.className='study-entry-label';entryLabel.textContent='출퇴근 출입구';this.labelLayer.append(entryLabel);this.entryLabel=entryLabel;
-    this.executive=new SharedExecutiveWing(this.world,this.labelLayer,{batch:batchStatic,onSelect:()=>this.onRoom?.('executive'),onOwnerSelect:()=>this.onOwner?.(),onSecretarySelect:()=>this.selectAmbient('secretary'),preferences});
+    this.roomSigns=new Map();
+    this.landmarkSigns=[];
+    this.executive=new SharedExecutiveWing(this.world,this.labelLayer,{batch:batchStatic,onOwnerSelect:()=>this.onOwner?.(),onSecretarySelect:()=>this.selectAmbient('secretary'),preferences});
     this.executive.secretary.root.userData.ambientCharacter='secretary';this.executive.companion.root.userData.ambientCharacter='secretary';
     this.actorLabels=new SharedOfficeLabels(this.labelLayer);
     this.actorLabels.add(this.executive.ownerLabel,{model:()=>this.executive.owner,name:()=>this.executive.ownerName,working:()=>this.executive.patrol.active||this.executive.patrol.commandUntil>performance.now(),alwaysFull:true,selected:()=>this.selectedOwner});
@@ -131,6 +129,7 @@ export class SharedOfficeScene {
     this.lights=[];this.ambientFixtures=[];this.layout=layout;this.navigator=new OfficeNavigator(this.layout);
     this.parking=buildSharedParking(layout.bounds,layout.elevator,batchStatic);
     this.layoutGroup=new THREE.Group();this.world.add(this.layoutGroup);this.buildSpace();
+    this.buildSigns();
     this.layoutGroup.add(this.parking.surfaceRamp);
     this.parking.group.visible=Boolean(this.parkingView);
     this.scene.add(this.parking.group);
@@ -198,7 +197,6 @@ export class SharedOfficeScene {
     this.live=false;this.geometrySignature='';this.stopWalk();for(const actor of this.actors)this.removeActor(actor);this.actors=[];this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');
     this.rebuildLayout(createSharedLayout(scenario));
     for(const assignment of createPreviewAssignments(this.layout,scenario))this.addActor(assignment);
-    for(const room of SHARED_ROOMS){const count=this.actors.filter(a=>a.seat.room===room.key).length;this.roomLabels.get(room.key).node.querySelector('span').textContent=`${count}명 · ${this.layout.pods.filter(p=>p.room===room.key).length} 포드`;}
     this.setProject(this.project);this.renderer.shadowMap.needsUpdate=true;this.updateLabels();return this.actors;
   }
   setLiveData({layout,assignments}){
@@ -228,6 +226,25 @@ export class SharedOfficeScene {
     }
     if(assignments.length)this.hasLiveAssignments=true;
     this.setProject(this.project);
+  }
+  buildSigns(){
+    const {rooms,boundaries,entrance}=this.layout;
+    this.roomSigns=new Map();
+    for(const room of rooms){
+      const gate=boundaries.gates.find(gate=>gate.room===room.key&&gate.side==='south');
+      const door={x:gate.center,z:room.bounds[3],w:gate.width};
+      const align=['studio','desk'].includes(room.key)?'right':'left';
+      const sign=buildWoodenSign(this.layoutGroup,{
+        door,side:gate.side,align,room:room.key,title:room.name,description:room.note,width:2.7,height:1,
+      });
+      this.roomSigns.set(room.key,sign);
+    }
+    this.landmarkSigns=[
+      buildWoodenSign(this.layoutGroup,{
+        door:{x:entrance.x+3.45,z:entrance.z,w:entrance.width},side:'east',
+        title:'출퇴근 출입구',description:'공용 오피스 정문',width:2.2,height:.82,
+      }),
+    ];
   }
   buildSpace(){
     const root=this.layoutGroup;
@@ -351,7 +368,12 @@ export class SharedOfficeScene {
     this.project=key;for(const actor of this.actors){const visible=!key||actor.project.key===key;actor.model.root.visible=visible;actor.marker.visible=visible;actor.label.hidden=!visible;}
     if(this.selectedId&&!this.actors.find(a=>a.id===this.selectedId)?.model.root.visible)this.selectedId=null;
     for(const actor of this.actors){actor.model.selection.visible=actor.id===this.selectedId;actor.label.classList.toggle('selected',actor.id===this.selectedId);}
-    for(const room of SHARED_ROOMS){const total=this.actors.filter(a=>a.seat.room===room.key).length,visible=this.actors.filter(a=>a.seat.room===room.key&&a.model.root.visible).length,pods=this.layout.pods.filter(p=>p.room===room.key).length;this.roomLabels.get(room.key).node.querySelector('span').textContent=`${key?`${visible}/${total}`:total}명 · ${pods} 포드`;}
+    for(const [room, sign] of this.roomSigns){
+      const actors=this.actors.filter(actor=>actor.seat.room===room);
+      const count=key?`${actors.filter(actor=>actor.model.root.visible).length}/${actors.length}`:actors.length;
+      const pods=this.layout.pods.filter(pod=>pod.room===room).length;
+      sign.write(undefined,`${count}명 · ${pods} 포드`);
+    }
     if(this.routeLine)this.routeLine.visible=this.walkActor?.model.root.visible;this.updateLabels();
   }
   selectActor(id){this.leaveCatView();this.selectedId=id;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.selectedRoom=null;for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=a.id===id;a.label.classList.toggle('selected',a.id===id);}const actor=this.actors.find(a=>a.id===id);if(actor)this.focusCharacter(actor.model);}
@@ -479,19 +501,15 @@ export class SharedOfficeScene {
     this.onView?.({zoom:this.zoom,elevation:Math.round(elevation*180/Math.PI),parking:Boolean(this.parkingView)});
   }
   pick(event){
-    if(this.parkingView)return;
+    if(!this.layout||this.parkingView)return;
     const b=this.renderer.domElement.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((event.clientX-b.left)/b.width*2-1,1-(event.clientY-b.top)/b.height*2),this.camera);
-    const roots=this.actors.filter(a=>a.model.root.visible).map(a=>a.model.root);if(this.executive.owner.root.visible)roots.push(this.executive.owner.root);if(this.visitor?.model.root.visible)roots.push(this.visitor.model.root);const secretary=this.executive.assisting?this.executive.companion:this.executive.secretary;if(secretary?.root.visible)roots.push(secretary.root);const hits=ray.intersectObjects([...roots,...this.cats.map(({model})=>model.root),...this.roomMeshes.values(),...this.executive.floors.values()],true);
+    const roots=this.actors.filter(a=>a.model.root.visible).map(a=>a.model.root);if(this.executive.owner.root.visible)roots.push(this.executive.owner.root);if(this.visitor?.model.root.visible)roots.push(this.visitor.model.root);const secretary=this.executive.assisting?this.executive.companion:this.executive.secretary;if(secretary?.root.visible)roots.push(secretary.root);const hits=ray.intersectObjects([...roots,...this.cats.map(({model})=>model.root),...this.roomMeshes.values(),...this.executive.floors.values(),...Array.from(this.roomSigns.values(),sign=>sign.root),this.executive.suiteSign.root],true);
     for(const hit of hits){let o=hit.object;while(o){if(o.userData.catIndex!==undefined){this.selectCat(this.cats[o.userData.catIndex].model);return;}if(o.userData.owner){this.onOwner?.();return;}if(o.userData.ambientCharacter){this.selectAmbient(o.userData.ambientCharacter);return;}if(o.userData.sessionId){this.onActor?.(o.userData.sessionId);return;}if(o.userData.room){this.onRoom?.(o.userData.room);return;}o=o.parent;}}
   }
   selectAmbient(kind){const model=kind==='visitor'?this.visitor?.model:(this.executive.assisting?this.executive.companion:this.executive.secretary);if(!model?.root.visible)return;this.leaveCatView();this.selectedAmbient=this.selectedAmbient===kind?null:kind;this.visitor.model.selection.visible=this.selectedAmbient==='visitor';this.executive.secretary.selection.visible=this.selectedAmbient==='secretary';this.executive.companion.selection.visible=this.selectedAmbient==='secretary';this.visitor.label.classList.toggle('selected',this.selectedAmbient==='visitor');this.executive.secretaryLabel.classList.toggle('selected',this.selectedAmbient==='secretary');if(this.selectedAmbient)this.focusCharacter(model);}
   projectPoint(node,point){const p=point.clone().project(this.camera);node.hidden=p.z< -1||p.z>1||p.x<-.97||p.x>.97||p.y<-.95||p.y>.95;node.style.left=`${(p.x+1)*this.width/2}px`;node.style.top=`${(1-p.y)*this.height/2}px`;return {x:(p.x+1)*this.width/2,y:(1-p.y)*this.height/2};}
   updateLabels(){
     if(!this.width||!this.layout||this.catView||this.parkingView)return;
-    for(const {node,point}of this.roomLabels.values())this.projectPoint(node,point);
-    this.projectPoint(this.entryLabel,new THREE.Vector3(this.layout.entrance.x+1.65,3.42,this.layout.entrance.z));
-    const garden=this.layout.park.label;this.projectPoint(this.gardenLabel,new THREE.Vector3(garden.x,.35,garden.z));
-    if(this.executive.layout)this.executive.updateLabels((node,point)=>this.projectPoint(node,point),this.zoom);
     for(const {model,label,actionLabel,anchor} of this.cats){
       if(this.showLabels){
         anchor.copy(model.root.position);
@@ -576,6 +594,8 @@ export class SharedOfficeScene {
     this.renderer.render(this.scene,camera);
   }
   disposeLayout(){
+    for(const sign of this.roomSigns.values())sign.dispose();
+    for(const sign of this.landmarkSigns)sign.dispose();
     this.parking?.dispose();
     this.groundDesign?.dispose();
     this.layoutGroup?.removeFromParent();

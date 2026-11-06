@@ -1,8 +1,8 @@
 import {bindOfficeExpansion} from './office-frame.js';
 import {DEFAULT_PREFERENCES} from './office-preferences.js';
 import {loadPreferences,savePreferences,mountOfficeSettings} from './office-settings.js';
-import {SharedOfficeScene} from './shared-office-scene.js';
-import {SHARED_ROOMS,PREVIEW_PROJECTS,SCENARIOS} from './shared-office-layout.js';
+import {SharedOfficeScene} from './shared-office-scene.js?v=20261107-3';
+import {SHARED_ROOMS,PREVIEW_PROJECTS,SCENARIOS} from './shared-office-layout.js?v=20261107-3';
 import {SharedOfficeOccupancy,sharedProjects} from './shared-office-state.js';
 import {OfficeLiveFeed} from './office-live-feed.js';
 

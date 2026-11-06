@@ -2,7 +2,7 @@ import {bindOfficeExpansion} from './office-frame.js';
 import {DEFAULT_PREFERENCES} from './office-preferences.js';
 import {loadPreferences,savePreferences,mountOfficeSettings} from './office-settings.js';
 import { characterSvg } from './office-art.js';
-import { OfficeScene } from './office-scene.js';
+import { OfficeScene } from './office-scene.js?v=20261107-3';
 import { BuildingDirectory } from './office-building.js';
 import { StaffIdentities, ownerPortrait } from './staff-identities.js';
 const $ = (selector) => document.querySelector(selector);

@@ -1,10 +1,11 @@
 import * as THREE from './vendor/three/three.module.js';
 import { beginCameraOrbit, characterFocusPoint, orbitHalfHeight, panCamera } from './office-camera.js';
 import { staffAppearance } from './staff-appearance.js';
+import { buildWoodenSign } from './office-room-signs.js';
 import { OfficeOwner } from './office-owner.js';
 import { buildExecutiveSuite as buildExecutiveInterior } from './office-executive-scene.js';
 import { SECRETARY_STATION, EXECUTIVE_INTERACTIONS, isInsideExecutiveSuite } from './office-executive.js';
-import { OfficeNavigator, OfficeWalker, roomAt, ROOM_LAYOUT, EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_WALLS, WALLS, DOORS, FURNITURE } from './office-navigation.js';
+import { OfficeNavigator, OfficeWalker, roomAt, ROOM_LAYOUT, EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_WALLS, WALLS, DOORS, FURNITURE } from './office-navigation.js?v=20261107-3';
 import { SecretaryRoutine, SECRETARY_STOPS } from './office-secretary.js';
 import { daylightAt, sunriseSunset } from './solar-time.js';
 import { OfficeVisitor } from './office-visitor.js';
@@ -28,6 +29,7 @@ export function secretaryLookForDate(date=new Date()){
 }
 const ROOM_NAMES={library:'자료실',studio:'개발실',server:'서버실',research:'정보검색실',meeting:'회의실',desk:'대기실'};
 const EXECUTIVE_ROOM_NAMES={library:'서재 · 기록실',studio:'비서실',server:'금고 · 기밀문서실',research:'프라이빗 라운지',meeting:'이사회실',desk:'CEO 집무실',reception:'접견실'};
+const ROOM_INFO={library:'파일 읽기 · 자료 찾기',studio:'프로젝트 개발 · 코드 작성',server:'실행 · 로그 · 서버 관리',research:'조사 · 참고 자료 검색',meeting:'검토 · 회의 · 의사결정',desk:'요청 접수 · 휴식'};
 const TASK_NAMES={library:'책 읽는 중',studio:'코드 수정 중',server:'명령 실행 중',research:'자료 찾는 중',meeting:'생각 정리 중',desk:'요청 확인 중',reception:'방문·요청을 확인 중'};
 const WORK_ACTION_NAMES={library:{primary:'자료를 읽는 중'},studio:{primary:'키보드로 코드를 작성 중'},server:{rack:'중요 기록을 확인 중',terminal:'보안 기록을 열람 중'},research:{primary:'컴퓨터로 정보를 검색 중',search:'자료를 찾아 살펴보는 중'},meeting:{primary:'문서를 검토 중',board:'칠판에 아이디어를 정리 중'},desk:{primary:'요청 내용을 확인 중'},reception:{primary:'방문객과 요청을 확인 중'}};
 const materials=new Map();
@@ -247,7 +249,6 @@ export class OfficeScene {
   this.sun=new THREE.DirectionalLight(0xfff4dc,2.1);this.sun.position.set(-8,20,12);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);Object.assign(this.sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20,near:1,far:60});this.sun.shadow.bias=-.00025;this.sun.shadow.normalBias=.025;this.sun.shadow.radius=3;this.scene.add(this.sun);
   this.librarianLabel=document.createElement('div');this.world=group(this.scene);this.buildOffice();
   this.labelLayer=document.createElement('div');this.labelLayer.className='world-labels';element.append(this.labelLayer);this.leaderLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');this.leaderLayer.classList.add('label-leaders');this.labelLayer.append(this.leaderLayer);
-  this.labels=new Map();for(const room of [...ROOM_LAYOUT,...EXECUTIVE_ROOM_LAYOUT.filter(item=>!ROOM_LAYOUT.some(base=>base.key===item.key))]){const label=document.createElement('button');label.className='world-room-label';label.dataset.room=room.key;label.innerHTML=`<i></i><span>${ROOM_NAMES[room.key]||EXECUTIVE_ROOM_NAMES[room.key]}</span>`;label.setAttribute('aria-label',`${ROOM_NAMES[room.key]||EXECUTIVE_ROOM_NAMES[room.key]} 작업 보기`);label.addEventListener('click',()=>this.onSelectRoom?.(room.key));this.labelLayer.append(label);this.labels.set(room.key,{node:label,point:new THREE.Vector3(...room.label)});}
   this.secretaryLookDay=secretaryLookForDate();this.secretaryModel=createCharacter(this.world,'studio',{index:2,accessory:'glasses',secretary:true,secretaryOutfit:this.secretaryLookDay.look});this.secretaryModel.root.position.set(SECRETARY_STATION.x+.18,0,SECRETARY_STATION.z);this.secretaryModel.root.rotation.y=SECRETARY_STATION.rotation;this.secretaryModel.root.scale.setScalar(1.08);this.secretaryModel.root.visible=false;this.secretaryModel.props.clipboard.visible=true;
   this.secretaryLabel=document.createElement('button');this.secretaryLabel.type='button';this.secretaryLabel.className='world-agent-label secretary-label show-task';this.secretaryLabel.addEventListener('click',()=>this.selectAmbient('secretary'));this.labelLayer.append(this.secretaryLabel);this.setSecretaryIdentity('비서');
   this.secretaryRoutine=null;this.secretaryRoutineExecutive=null;this.secretaryEscortWalker=null;this.secretaryEscortContext=null;this.secretaryEscortStart=null;this.secretaryEscortTargetIndex=null;this.secretaryEscorting=false;this.secretaryServiceTimers={tea:0,snacks:0};this.secretaryServings={tea:secretaryTray(this.executiveSuiteGroup),snacks:secretaryTray(this.executiveSuiteGroup,{snacks:true})};this.secretaryServings.tea.position.set(-1.02,1.06,-1.65);this.secretaryServings.snacks.position.set(-8.65,.55,-4.35);for(const tray of Object.values(this.secretaryServings))tray.visible=false;
@@ -342,6 +343,12 @@ export class OfficeScene {
   for(const x of [-10.5,-7.6,-2.3,.7,6.0,9.1]){box(this.standardOuterWallsGroup,0xd8e8df,x,1.85,-7.87,2.1,1.45,.035,false);for(const offset of [-1.1,1.1])box(this.standardOuterWallsGroup,0xfffcf0,x+offset,1.85,-7.82,.07,1.62,.08,false);for(const y of [1.08,1.85,2.62])box(this.standardOuterWallsGroup,0xfffcf0,x,y,-7.82,2.25,.06,.08,false);box(this.standardOuterWallsGroup,0xfffcf0,x,1.85,-7.82,.06,1.5,.08,false);}
   for(const item of FURNITURE)furniture(this.standardLayoutGroup,item,this.lights);
   for(let x=-9.4;x<=9.5;x+=2.35){const triangle=mesh(this.standardLayoutGroup,new THREE.ConeGeometry(.075,.18,3),0xc1c8b5,x,.055,0,.7,.12,1,false);triangle.rotation.z=-Math.PI/2;triangle.rotation.x=Math.PI/2;}
+  this.roomSigns=ROOM_LAYOUT.map(room=>{
+   const door=DOORS.find(door=>door.x===room.x&&Math.sign(door.z)===Math.sign(room.z));
+   return buildWoodenSign(this.standardLayoutGroup,{
+    door,side:room.z<0?'south':'north',room:room.key,title:ROOM_NAMES[room.key],description:ROOM_INFO[room.key],
+   });
+  });
   this.buildExecutiveSuite();
   this.buildArchiveRoom();
  }
@@ -414,12 +421,13 @@ export class OfficeScene {
   model.armR.rotation.x=this.motion&&moving?Math.sin(cycle)*.32:walk.inspecting?-.95:-.18;
   if(walk.inspecting){model.head.rotation.x=.10+Math.sin(time*.003)*.035;model.armR.rotation.z=.12;}else{model.head.rotation.x=0;model.armR.rotation.z=0;}
  }
- buildExecutiveSuite(){buildExecutiveInterior(this.executiveSuiteGroup,this.executiveRoomMeshes);}
+ buildExecutiveSuite(){
+  buildExecutiveInterior(this.executiveSuiteGroup,this.executiveRoomMeshes);
+ }
  setExecutiveOffice(active){
   const firstExecutive=active&&!this.hasSetExecutiveView,changed=this.navigator.executive!==active;this.navigator.setExecutive(active);this.executiveSuiteGroup.visible=active;this.standardLayoutGroup.visible=!active;this.standardOuterWallsGroup.visible=!active&&!this.archiveMode;this.element.classList.toggle('executive-scene',active);this.secretaryModel.root.visible=!this.archiveMode&&(active||this.owner?.journey.floor===this.context);
   this.roomMeshes=active?this.executiveRoomMeshes:this.standardRoomMeshes;
-  const layout=active?EXECUTIVE_ROOM_LAYOUT:ROOM_LAYOUT,names=active?EXECUTIVE_ROOM_NAMES:ROOM_NAMES;
-  for(const [key,label]of this.labels){const room=layout.find(item=>item.key===key);label.node.hidden=!room;label.node.dataset.zone=active?(['studio','reception','meeting'].includes(key)?'public':key==='desk'?'office':'private'):'';label.node.querySelector('span').textContent=names[key]||ROOM_NAMES[key]||key;label.node.setAttribute('aria-label',`${names[key]||ROOM_NAMES[key]||key} 작업 보기`);if(room)label.point.set(...room.label);label.node.classList.toggle('selected',key===this.selectedRoom);}
+  const layout=active?EXECUTIVE_ROOM_LAYOUT:ROOM_LAYOUT;
   for(const [key,floor]of this.roomMeshes){if(!floor.userData.originalMaterial)floor.userData.originalMaterial=floor.material;if(floor.material!==floor.userData.originalMaterial)floor.material.dispose();floor.material=floor.userData.originalMaterial;floor.material.color.set(layout.find(room=>room.key===key)?.color||'#eeeeee');if(key===this.selectedRoom){floor.material=new THREE.MeshStandardMaterial({color:layout.find(room=>room.key===key)?.color||'#eeeeee',emissive:0x8eaf6d,emissiveIntensity:.16,roughness:.9});}}
   this.routeSignature='';if(changed){this.orbitFrame=null;if(firstExecutive){this.elevation=.8;this.angle=.67;this.zoom=1;this.hasSetExecutiveView=true;if(this.owner?.journey.floor===this.context&&this.owner.journey.phase==='idle')this.owner.walker=new OfficeWalker(this.navigator,this.owner.homePoint());}this.resize();}this.updateLabels();if(changed&&active&&this.owner?.journey.floor===this.context&&['idle','commanding'].includes(this.owner.journey.phase))this.owner.walker.setDestination(this.owner.homePoint(),'desk');
  }
@@ -433,7 +441,7 @@ export class OfficeScene {
   canvas.addEventListener('wheel',event=>{if(!canNavigate())return;event.preventDefault();this.setZoom(this.zoom*Math.exp(-event.deltaY*.001));},{passive:false});
   canvas.addEventListener('keydown',event=>{if(event.key!=='0'&&!canNavigate())return;if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-','0'].includes(event.key))return;event.preventDefault();if(event.key.startsWith('Arrow'))beginCameraOrbit(this);if(event.key==='ArrowLeft')this.angle-=.12;if(event.key==='ArrowRight')this.angle+=.12;if(event.key==='ArrowUp')this.elevation=Math.min(1.555,this.elevation+.08);if(event.key==='ArrowDown')this.elevation=Math.max(0,this.elevation-.08);if(event.key==='+'){this.setZoom(this.zoom*1.1);return;}if(event.key==='-'){this.setZoom(this.zoom/1.1);return;}if(event.key==='0')this.resetView();this.resize();});
  }
- pick(event){const bounds=this.renderer.domElement.getBoundingClientRect(),point=new THREE.Vector2((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);const ray=new THREE.Raycaster();ray.setFromCamera(point,this.camera);const hits=ray.intersectObjects(this.world.children,true);for(const hit of hits){let object=hit.object;while(object){if(object.userData.owner){this.onOwnerSelect?.();return;}if(object.userData.ambientCharacter){this.selectAmbient(object.userData.ambientCharacter);return;}if(object.userData.sessionId){this.onSelectSession?.(object.userData.sessionId);return;}if(object.userData.room){this.onSelectRoom?.(object.userData.room);return;}object=object.parent;}}}
+ pick(event){const bounds=this.renderer.domElement.getBoundingClientRect(),point=new THREE.Vector2((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);const ray=new THREE.Raycaster();ray.setFromCamera(point,this.camera);const hits=ray.intersectObjects(this.world.children,true);for(const hit of hits){let object=hit.object;while(object){if(object.userData.owner){this.onOwnerSelect?.();return;}if(object.userData.ambientCharacter){this.selectAmbient(object.userData.ambientCharacter);return;}if(object.userData.sessionId){this.onSelectSession?.(object.userData.sessionId);return;}if(object.userData.room&&object.parent?.visible){this.onSelectRoom?.(object.userData.room);return;}object=object.parent;}}}
  selectAmbient(kind){const model=kind==='visitor'?this.visitor?.model:this.secretaryModel;if(!model?.root.visible)return;this.selectedAmbient=this.selectedAmbient===kind?null:kind;for(const [key,item]of [['secretary',this.secretaryModel],['visitor',this.visitor?.model]])if(item){item.selection.visible=this.selectedAmbient===key;const label=key==='visitor'?this.visitor.label:this.secretaryLabel;label.classList.toggle('selected',this.selectedAmbient===key);}if(this.selectedAmbient)this.focusCharacter(model);}
  resize(){
   const width=this.element.clientWidth,height=this.element.clientHeight;if(!width||!height)return;
@@ -455,7 +463,7 @@ export class OfficeScene {
  setMotion(enabled){this.motion=enabled;}
  setEvening(enabled){this.scene.background.set(enabled?'#34463d':'#eef2ed');this.renderer.toneMappingExposure=enabled?.78:1.0;}
  setPaths(enabled){this.paths=enabled;this.routeSignature='';}
- setSelectedRoom(room){if(this.selectedRoom===room)return;this.selectedRoom=room;if(room)this.setOwnerSelected(false);const layout=this.navigator.roomLayout;for(const [key,floor] of this.roomMeshes){if(!floor.userData.originalMaterial)floor.userData.originalMaterial=floor.material;if(floor.material!==floor.userData.originalMaterial)floor.material.dispose();const color=layout.find(item=>item.key===key)?.color||'#eeeeee';floor.material=key===room?new THREE.MeshStandardMaterial({color,emissive:0x8eaf6d,emissiveIntensity:.16,roughness:.9}):floor.userData.originalMaterial;floor.material.color.set(color);}for(const [key,label]of this.labels)label.node.classList.toggle('selected',key===room);}
+ setSelectedRoom(room){if(this.selectedRoom===room)return;this.selectedRoom=room;if(room)this.setOwnerSelected(false);const layout=this.navigator.roomLayout;for(const [key,floor] of this.roomMeshes){if(!floor.userData.originalMaterial)floor.userData.originalMaterial=floor.material;if(floor.material!==floor.userData.originalMaterial)floor.material.dispose();const color=layout.find(item=>item.key===key)?.color||'#eeeeee';floor.material=key===room?new THREE.MeshStandardMaterial({color,emissive:0x8eaf6d,emissiveIntensity:.16,roughness:.9}):floor.userData.originalMaterial;floor.material.color.set(color);}}
  setSelectedSession(id){this.selectedId=id;if(id)this.setOwnerSelected(false);for(const [key,actor]of this.actors){actor.model.selection.visible=key===id;actor.label.classList.toggle('selected',key===id);}this.routeSignature='';}
  setOwnerSelected(selected){this.ownerSelected=Boolean(selected);if(this.owner?.model){this.owner.model.selection.visible=this.ownerSelected;this.owner.label.classList.toggle('selected',this.ownerSelected);this.owner.label.setAttribute('aria-pressed',String(this.ownerSelected));}}
  setSessions(sessions,context,archiveMode=false){
@@ -463,7 +471,6 @@ export class OfficeScene {
   this.context=context;
   if(archiveMode){
    this.element.classList.remove('executive-scene');this.archiveRoomGroup.visible=true;this.standardLayoutGroup.visible=false;this.standardOuterWallsGroup.visible=false;this.executiveSuiteGroup.visible=false;this.secretaryModel.root.visible=false;this.secretaryLabel.hidden=true;this.navigator.setExecutive(false);this.roomMeshes=new Map([['library',this.archiveFloor]]);
-   for(const label of this.labels.values())label.node.hidden=true;
   }else{
    this.archiveRoomGroup.visible=false;this.standardOuterWallsGroup.visible=true;
    const executive=context===this.executiveFloorKey&&Boolean(this.executiveFloorKey),layoutChanged=executive!==this.navigator.executive;
@@ -544,9 +551,8 @@ export class OfficeScene {
  }
  updateLabels(){
   if(!this.width)return;
-  if(this.archiveMode){if(this.visitor)this.visitor.label.hidden=true;for(const {node}of this.labels.values())node.hidden=true;for(const actor of this.actors.values())actor.label.hidden=true;if(this.owner?.label)this.owner.label.hidden=true;this.secretaryLabel.hidden=true;const walk=this.archiveLibrarianWalk,model=this.archiveLibrarian;if(model&&walk){const action=this.librarianLabel.querySelector('span');const text=walk.inspecting?'자료를 살펴보는 중':'서가를 순회하는 중';if(action.textContent!==text){action.textContent=text;this.librarianLabel.setAttribute('aria-label',`모아 · ${text}`);}this.placeLabel(this.librarianLabel,new THREE.Vector3(model.root.position.x,2.45,model.root.position.z));}else this.librarianLabel.hidden=true;return;}
+  if(this.archiveMode){if(this.visitor)this.visitor.label.hidden=true;for(const actor of this.actors.values())actor.label.hidden=true;if(this.owner?.label)this.owner.label.hidden=true;this.secretaryLabel.hidden=true;const walk=this.archiveLibrarianWalk,model=this.archiveLibrarian;if(model&&walk){const action=this.librarianLabel.querySelector('span');const text=walk.inspecting?'자료를 살펴보는 중':'서가를 순회하는 중';if(action.textContent!==text){action.textContent=text;this.librarianLabel.setAttribute('aria-label',`모아 · ${text}`);}this.placeLabel(this.librarianLabel,new THREE.Vector3(model.root.position.x,2.45,model.root.position.z));}else this.librarianLabel.hidden=true;return;}
   this.librarianLabel.hidden=true;
-  for(const [key,{node,point}]of this.labels){if(!this.navigator.roomLayout.some(room=>room.key===key)){node.hidden=true;continue;}this.placeLabel(node,point);}
   for(const actor of this.actors.values()){
     if(actor.session.projectKey!==this.context){actor.label.hidden=true;continue;}
     actor.label.classList.add('show-task');
@@ -563,9 +569,9 @@ export class OfficeScene {
   node.hidden=projected.x< -1.1||projected.x>1.1||projected.y< -1.1||projected.y>1.1;
  }
  layoutLabels(){
-  const nodes=[...this.labels.values()].map(label=>label.node).concat([...this.actors.values()].map(actor=>actor.label),this.secretaryLabel,this.librarianLabel,this.owner?.label||[],this.visitor?.label||[]);
+  const nodes=[...this.actors.values()].map(actor=>actor.label).concat(this.secretaryLabel,this.librarianLabel,this.owner?.label||[],this.visitor?.label||[]);
   const placed=[];
-  const priority=node=>node.classList.contains('selected')?0:node.classList.contains('owner-label')?1:node.classList.contains('world-room-label')?2:node.classList.contains('receiving')?3:node.classList.contains('show-task')?4:5;
+  const priority=node=>node.classList.contains('selected')?0:node.classList.contains('owner-label')?1:node.classList.contains('receiving')?3:node.classList.contains('show-task')?4:5;
   nodes.sort((a,b)=>priority(a)-priority(b));
   for(const node of nodes){
     if(node._leader)node._leader.style.display='none';
@@ -603,5 +609,5 @@ export class OfficeScene {
   this.visitor.update(this.navigator,dt,time,this.motion,!this.archiveMode,pair);this.updateLabels();this.updateRoute();this.renderer.render(this.scene,this.camera);
   const signature=[...this.actors.keys()].map(id=>{const state=this.getStatus(id);return `${id}:${state.phase}:${state.room}:${state.target}`;}).join('|');if(signature!==this.statusSignature){this.statusSignature=signature;this.onStatusChange?.();}
  }
- destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.visitor.destroy(disposeCharacter);this.renderer.dispose();this.element.replaceChildren();}
+ destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.visitor.destroy(disposeCharacter);for(const sign of this.roomSigns)sign.dispose();this.renderer.dispose();this.element.replaceChildren();}
 }

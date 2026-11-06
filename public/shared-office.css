@@ -166,10 +166,3 @@ button.study-nameplate{pointer-events:auto}
   .study-stage.parking-view #study-detail{right:auto;bottom:116px}
   .study-stage.parking-view #study-detail p{display:none}
 }
-/* Each room is identified by an architectural plaque anchored over its zone. */
-.study-room-label{--room-sign:var(--room-color,#82946c);position:relative;overflow:visible;flex-direction:column;align-items:flex-start;gap:2px;min-width:98px;padding:5px 9px 6px;border:1px solid color-mix(in srgb,var(--room-sign) 48%,#e8e1cf);border-top:3px solid var(--room-sign);border-radius:2px;background:#f8f4e8;color:#465641;box-shadow:0 2px 0 #3d493326,0 4px 9px #35452e20;backdrop-filter:none;text-align:left}
-.study-room-label::after{content:"";position:absolute;top:100%;left:50%;width:2px;height:9px;background:color-mix(in srgb,var(--room-sign) 66%,#918873);transform:translateX(-50%);box-shadow:1px 0 #fff9}
-.study-room-label strong{font-size:11px;font-weight:650;letter-spacing:-.2px;color:#465641}
-.study-room-label span{padding:0;border:0;color:#838a76;font-size:8px;line-height:1.3}
-.study-room-label:hover,.study-room-label.selected{border-color:var(--room-sign);border-top-color:var(--room-sign);background:#fffdf4;box-shadow:0 2px 0 #3d493326,0 0 0 2px color-mix(in srgb,var(--room-sign) 18%,transparent),0 4px 10px #35452e20}
-.study-executive-room-label{min-width:0}

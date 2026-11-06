@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three/three.module.js';
+import {buildWoodenSign} from './office-room-signs.js';
 import {buildExecutiveSuite} from './office-executive-scene.js';
 import {EXECUTIVE_ROOM_LAYOUT,isInsideExecutiveSuite} from './office-executive.js';
 import {createCharacter,disposeCharacter,secretaryLookForDate} from './office-scene.js';
@@ -6,12 +7,10 @@ import {OfficeNavigator,OfficeWalker,roomAt} from './office-navigation.js';
 import {SecretaryRoutine} from './office-secretary.js';
 import {CeoRoutine,CEO_ACTION_TEXT,CEO_REST_ACTIONS,applyCeoRestPose} from './ceo-routine.js';
 
-const EXECUTIVE_ROOM_NAMES={library:'서재 · 기록실',studio:'비서실',server:'금고 · 기밀문서실',research:'프라이빗 라운지',meeting:'이사회실',desk:'CEO 집무실',reception:'접견실'};
-
 // The tower interior and secretary routine run in their original coordinates.
 // A single parent transform places the entire suite in the shared office.
 export class SharedExecutiveWing {
-  constructor(world,labelLayer,{batch,onSelect,onOwnerSelect,onSecretarySelect,preferences={}}={}){
+  constructor(world,labelLayer,{batch,onOwnerSelect,onSecretarySelect,preferences={}}={}){
     this.world=world;this.labelLayer=labelLayer;this.root=new THREE.Group();world.add(this.root);this.floors=new Map();
     buildExecutiveSuite(this.root,this.floors);
     for(const floor of this.floors.values())floor.userData.room='executive';
@@ -34,11 +33,10 @@ export class SharedExecutiveWing {
     this.companion=createCharacter(world,'studio',{index:2,accessory:'glasses',secretary:true,secretaryOutfit:this.secretaryLook.look});this.companion.root.scale.setScalar(1.08);this.companion.root.visible=false;this.companionWalker=null;this.companionTargetIndex=null;this.assisting=false;
     for(const model of [this.owner,this.secretary,this.companion])model.root.traverse(node=>{if(node.isMesh)node.castShadow=false;});
     this.routine=new SecretaryRoutine(this.navigator);
-    this.label=document.createElement('button');this.label.className='study-room-label study-executive-label';
-    const title=document.createElement('strong'),subtitle=document.createElement('span');
-    title.textContent=String(preferences.executiveSuiteName||'').trim()||'CEO 집무실';subtitle.textContent='비서실 · 접견실 · 서재';this.label.append(title,subtitle);
-    this.label.setAttribute('aria-label','CEO 집무실 확대');this.label.addEventListener('click',onSelect);labelLayer.append(this.label);
-    this.roomLabels=EXECUTIVE_ROOM_LAYOUT.map(room=>{const node=document.createElement('div');node.className='study-room-label study-executive-room-label';const name=document.createElement('strong');name.textContent=EXECUTIVE_ROOM_NAMES[room.key]||room.key;node.append(name);node.setAttribute('aria-label',name.textContent);labelLayer.append(node);return{node,point:room.label};});
+    this.suiteSign=buildWoodenSign(this.root,{
+      door:{x:-12,z:0,w:2.7},side:'west',room:'executive',
+      title:'CEO 집무실',description:'비서실 · 접견실 · 서재',width:1.9,
+    });
     this.ownerName=String(preferences.ownerName||'').trim()||'회장님';this.secretaryName=String(preferences.secretaryName||'').trim()||'비서';
     this.ownerTitle=preferences.ownerTitle||'CEO';
     this.ownerLabel=this.personLabel(this.ownerName,this.ownerTitle,this.patrol.text,'owner',onOwnerSelect);
@@ -47,7 +45,7 @@ export class SharedExecutiveWing {
   }
   setPreferences(preferences){
     this.ownerName=preferences.ownerName||'회장님';this.ownerTitle=preferences.ownerTitle||'CEO';this.ownerRank=String(preferences.ownerRank||'').replace(/^#/,'');this.secretaryName=preferences.secretaryName||'비서';
-    this.label.querySelector('strong').textContent=preferences.executiveSuiteName||'CEO 집무실';
+    this.suiteSign.write(preferences.executiveSuiteName||'CEO 집무실');
     this.ownerLabel.querySelector('strong>span').textContent=this.ownerName;
     this.ownerLabel.querySelector('.study-agent-rank').textContent=`${this.ownerTitle}${this.ownerRank?` · #${this.ownerRank}`:''}`;
     this.secretaryLabel.querySelector('strong>span').textContent=this.secretaryName;
@@ -167,13 +165,10 @@ export class SharedExecutiveWing {
     for(const [key,prop]of Object.entries(model.props))prop.visible=commanding?key==='phone':Boolean(resting?.prop&&key===resting.prop);
     model.eyes.scale.y=motion&&time%5400>5250?.1:1;
   }
-  updateLabels(projectPoint,zoom){
-    projectPoint(this.label,this.point(-2.1,1.1,6.9));
-    for(const room of this.roomLabels)projectPoint(room.node,this.point(...room.point));
-  }
   destroy(){
     for(const model of [this.owner,this.secretary,this.companion]){disposeCharacter(model);model.root.removeFromParent();}
     for(const geometry of this.geometries)geometry.dispose();for(const material of this.materials)material.dispose();for(const texture of this.textures)texture.dispose();
-    this.root.removeFromParent();this.label.remove();for(const room of this.roomLabels)room.node.remove();this.ownerLabel.remove();this.secretaryLabel.remove();
+    this.suiteSign.dispose();
+    this.root.removeFromParent();this.ownerLabel.remove();this.secretaryLabel.remove();
   }
 }

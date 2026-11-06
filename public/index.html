@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f7f8f3"><meta name="description" content="프로젝트별 층으로 연결된 나의 AI 오피스"><title>타워 오피스 · My AI Office</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/office-frame.css"><link rel="stylesheet" href="/office-settings.css"><link rel="stylesheet" href="/sidebar-typography.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css?v=20261107-3"><link rel="stylesheet" href="/office-frame.css"><link rel="stylesheet" href="/office-settings.css"><link rel="stylesheet" href="/sidebar-typography.css">
 </head>
 <body class="office-frame tower-office" data-office-view="tower">
 <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
@@ -57,5 +57,5 @@
 <dialog id="office-setup-dialog" class="app-dialog setup-dialog"><div class="dialog-heading"><div><span class="overline">WELCOME TO YOUR OFFICE</span><h2>회장실을 준비해 볼까요?</h2></div></div><p class="dialog-intro">회장실 이름과 회장님 이름을 정해주세요. 나중에 설정에서 언제든 바꿀 수 있어요.</p><form id="office-setup-form"><label>회장실 이름<input id="setup-suite-name" type="text" maxlength="40" required></label><label>회장 이름<input id="setup-owner-name" type="text" maxlength="40" autocomplete="name" placeholder="이름을 입력해 주세요" required></label><button class="primary-button" type="submit">이름 정하고 시작</button></form></dialog>
 <dialog id="settings-dialog"></dialog>
 <dialog id="activity-dialog" class="app-dialog activity-dialog"><div class="dialog-heading"><div><span class="overline">WORK, ONE LITTLE STEP AT A TIME</span><h2>최근 세션 활동</h2></div><button class="icon-button close-dialog" aria-label="활동 기록 닫기"><svg><use href="#i-close"/></svg></button></div><p class="dialog-intro" id="activity-dialog-subtitle"></p><div class="activity-filters" role="group" aria-label="활동 필터"><button class="filter-chip selected" data-activity="all">전체</button><button class="filter-chip" data-activity="active">작업 중</button><button class="filter-chip" data-activity="agent">서브에이전트</button></div><div class="activity-log" id="activity-log"></div></dialog>
-<div class="toast" id="toast" role="status"></div><script src="/app.js?v=20261024-1" type="module"></script>
+<div class="toast" id="toast" role="status"></div><script src="/app.js?v=20261107-3" type="module"></script>
 </body></html>

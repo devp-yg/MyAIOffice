@@ -7,12 +7,12 @@ export const CHARACTER_RADIUS = 0.43;
 export const CELL_SIZE = 0.4;
 export const OFFICE_BOUNDS = { minX: -14.8, maxX: 12, minZ: -8, maxZ: 8 };
 export const ROOM_LAYOUT = [
-  { key: 'library', x: -8, z: -4.75, color: '#eee0c6', label: [-8, 2.65, -7.0], bounds: [-11.8,-4.2,-7.8,-1.6] },
-  { key: 'studio', x: 0, z: -4.75, color: '#dfe8d7', label: [0, 2.65, -7.0], bounds: [-3.8,3.8,-7.8,-1.6] },
-  { key: 'server', x: 8, z: -4.75, color: '#dce5ed', label: [8, 2.65, -7.0], bounds: [4.2,11.8,-7.8,-1.6] },
-  { key: 'desk', x: -8, z: 4.75, color: '#f0e0cd', label: [-9.2, 1.7, 7.0], bounds: [-11.8,-4.2,1.6,7.8] },
-  { key: 'meeting', x: 0, z: 4.75, color: '#e8deed', label: [-0.4, 1.7, 7.0], bounds: [-3.8,3.8,1.6,7.8] },
-  { key: 'research', x: 8, z: 4.75, color: '#dcebe5', label: [8, 1.7, 7.0], bounds: [4.2,11.8,1.6,7.8] },
+  { key: 'library', x: -8, z: -4.75, color: '#eee0c6', label: [-9.45, 2.0, -2.25], bounds: [-11.8,-4.2,-7.8,-1.6] },
+  { key: 'studio', x: 0, z: -4.75, color: '#dfe8d7', label: [-1.45, 2.0, -2.25], bounds: [-3.8,3.8,-7.8,-1.6] },
+  { key: 'server', x: 8, z: -4.75, color: '#dce5ed', label: [6.55, 2.0, -2.25], bounds: [4.2,11.8,-7.8,-1.6] },
+  { key: 'desk', x: -8, z: 4.75, color: '#f0e0cd', label: [-6.55, 1.8, 2.25], bounds: [-11.8,-4.2,1.6,7.8] },
+  { key: 'meeting', x: 0, z: 4.75, color: '#e8deed', label: [1.45, 1.8, 2.25], bounds: [-3.8,3.8,1.6,7.8] },
+  { key: 'research', x: 8, z: 4.75, color: '#dcebe5', label: [9.45, 1.8, 2.25], bounds: [4.2,11.8,1.6,7.8] },
 ];
 export const WALLS = [
   { x:0,z:-8,w:24.2,d:.2,h:2.9,outer:true },
