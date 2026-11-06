@@ -1,6 +1,6 @@
 import * as THREE from './vendor/three/three.module.js';
 import {buildWoodenSign} from './office-room-signs.js';
-import {buildExecutiveSuite} from './office-executive-scene.js';
+import {buildExecutiveRoof,buildExecutiveSuite} from './office-executive-scene.js';
 import {EXECUTIVE_ROOM_LAYOUT,isInsideExecutiveSuite} from './office-executive.js';
 import {createCharacter,disposeCharacter,secretaryLookForDate} from './office-scene.js';
 import {OfficeNavigator,OfficeWalker,roomAt} from './office-navigation.js';
@@ -25,6 +25,7 @@ export class SharedExecutiveWing {
     });
     for(const floor of this.floors.values())this.materials.add(floor.material);
     batch(this.root);
+    this.roof=buildExecutiveRoof(this.root);
     this.navigator=new OfficeNavigator();this.navigator.setExecutive(true);
     this.owner=createCharacter(world,'server',{owner:true});this.owner.root.userData.owner=true;
     this.ownerWalker=null;this.sharedNavigator=null;this.patrol=new CeoRoutine();

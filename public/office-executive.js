@@ -1,6 +1,7 @@
 // One architectural model is used by both the renderer and the route planner.
 // West is the visitor entrance; the entire private wing is reached through the CEO office.
 export const EXECUTIVE_BOUNDS = { minX:-14.8, maxX:7.8, minZ:-7, maxZ:7 };
+export const EXECUTIVE_WALL_HEIGHT = 2.6;
 // Include every room and the private gallery, but exclude the elevator lobby.
 export function isInsideExecutiveSuite({x,z}){return x>=-12&&x<=EXECUTIVE_BOUNDS.maxX&&z>=EXECUTIVE_BOUNDS.minZ&&z<=EXECUTIVE_BOUNDS.maxZ;}
 export const EXECUTIVE_ROOM_LAYOUT = [
@@ -39,16 +40,16 @@ function run(axis,at,from,to,ids=[],options={}){
   const openings=ids.map(id=>EXECUTIVE_DOORS.find(door=>door.id===id)).sort((a,b)=>a[axis]-b[axis]);
   const segment=(a,b)=>{
     if(b-a<.01)return;
-    walls.push({x:axis==='x'?(a+b)/2:at,z:axis==='z'?(a+b)/2:at,w:axis==='x'?b-a:.18,d:axis==='z'?b-a:.18,h:2.6,axis,...options});
+    walls.push({x:axis==='x'?(a+b)/2:at,z:axis==='z'?(a+b)/2:at,w:axis==='x'?b-a:.18,d:axis==='z'?b-a:.18,h:EXECUTIVE_WALL_HEIGHT,axis,...options});
   };
   for(const door of openings){segment(start,door[axis]-door.w/2);start=door[axis]+door.w/2;}
   segment(start,to);
 }
-run('x',-7,-12,7.8,[],{outer:true,displayHeight:2.6});
-run('x',7,-12,7.8,[],{outer:true,displayHeight:.65});
-run('z',-12,-7,-1.35,[],{outer:true,displayHeight:2.6});
-run('z',-12,1.35,7,[],{outer:true,displayHeight:1.1});
-run('z',7.8,-7,7,[],{outer:true,displayHeight:.8});
+run('x',-7,-12,7.8,[],{outer:true});
+run('x',7,-12,7.8,[],{outer:true});
+run('z',-12,-7,-1.35,[],{outer:true});
+run('z',-12,1.35,7,[],{outer:true});
+run('z',7.8,-7,7,[],{outer:true});
 // This continuous wall is the secretary's backdrop and the public/private boundary.
 run('z',-5.8,-7,1.6,['reception-office'],{displayHeight:2.05,feature:true});
 run('x',-1.8,-12,-5.8,['lobby-reception'],{displayHeight:1.25});

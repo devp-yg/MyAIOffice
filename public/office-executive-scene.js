@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three/three.module.js';
-import { EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_GALLERY_REGIONS, EXECUTIVE_WALLS, EXECUTIVE_DOORS, EXECUTIVE_DOOR_LEAVES, EXECUTIVE_FURNITURE } from './office-executive.js';
+import { EXECUTIVE_ROOM_LAYOUT, EXECUTIVE_GALLERY_REGIONS, EXECUTIVE_WALLS, EXECUTIVE_WALL_HEIGHT, EXECUTIVE_DOORS, EXECUTIVE_DOOR_LEAVES, EXECUTIVE_FURNITURE } from './office-executive.js';
 
 const C={ivory:0xf1ebdf,stone:0xe2ded3,walnut:0x654d3c,darkWood:0x47392f,oak:0xb59a77,brass:0xb99d67,sage:0x718477,forest:0x354d44,linen:0xe8dfcc,clay:0xbba391,ink:0x273d38};
 const cube=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(1,16,12),cyl=new THREE.CylinderGeometry(1,1,1,24),mats=new Map();
@@ -134,6 +134,14 @@ function window(root,x,z,w){
   for(const y of [1.1,2.45])box(root,C.ivory,x,y,z+.07,w+.15,.075,.1,false);
   box(root,0xcdbf9e,x,1.04,z+.12,w+.25,.08,.25,false);
 }
+export function buildExecutiveRoof(root){
+  const roof=group(root,-2.1,0);
+  roof.userData.room='executive';
+  box(roof,C.walnut,0,EXECUTIVE_WALL_HEIGHT+.2,0,20.25,.28,14.45);
+  box(roof,C.sage,0,EXECUTIVE_WALL_HEIGHT+.38,0,20.45,.09,14.65);
+  return roof;
+}
+
 export function buildExecutiveSuite(root,floors){
   box(root,0xa8b0a2,-2.1,-.33,0,20.25,.55,14.45);box(root,C.brass,-2.1,-.045,0,20.04,.055,14.24);box(root,C.stone,-2.1,-.005,0,19.9,.05,14.1);
   for(const room of EXECUTIVE_ROOM_LAYOUT)addFloor(root,room,floors);
