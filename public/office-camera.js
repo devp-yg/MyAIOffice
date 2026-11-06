@@ -1,6 +1,9 @@
 import * as THREE from './vendor/three/three.module.js';
 
 export function beginCameraOrbit(view){
+  view.transition=null;
+  // A symmetric frame already orbits around viewTarget, including elevated targets.
+  if(view.orbitFrame)return;
   const {camera,viewTarget,zoom}=view;
   const ray=new THREE.Raycaster();
   ray.setFromCamera(new THREE.Vector2(0,0),camera);
@@ -13,7 +16,10 @@ export function beginCameraOrbit(view){
   }
   viewTarget.copy(pivot);
   view.orbitFrame={halfWidth:(camera.right-camera.left)*zoom/2,halfHeight:(camera.top-camera.bottom)*zoom/2};
-  view.transition=null;
+}
+
+export function characterFocusPoint(model,target=new THREE.Vector3()){
+  return model.body.localToWorld(target.set(0,.8,0));
 }
 
 export function orbitHalfHeight(view,aspect){

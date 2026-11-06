@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three/three.module.js';
-import {orbitHalfHeight} from './office-camera.js';
+import {beginCameraOrbit,characterFocusPoint,orbitHalfHeight} from './office-camera.js';
 import {OfficeScene,createCharacter,disposeCharacter,furniture} from './office-scene.js';
 import {OfficeNavigator,OfficeWalker} from './office-navigation.js';
 import {SHARED_ROOMS,ROOM_CORNER_RADIUS,ZONE_BOUNDARY_STYLES,createSharedLayout,createPreviewAssignments} from './shared-office-layout.js';
@@ -261,10 +261,20 @@ export class SharedOfficeScene {
     for(const room of SHARED_ROOMS){const total=this.actors.filter(a=>a.seat.room===room.key).length,visible=this.actors.filter(a=>a.seat.room===room.key&&a.model.root.visible).length,pods=this.layout.pods.filter(p=>p.room===room.key).length;this.roomLabels.get(room.key).node.querySelector('span').textContent=`${key?`${visible}/${total}`:total}명 · ${pods} 포드`;}
     if(this.routeLine)this.routeLine.visible=this.walkActor?.model.root.visible;this.updateLabels();
   }
-  selectActor(id){this.selectedId=id;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.selectedRoom=null;for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=a.id===id;a.label.classList.toggle('selected',a.id===id);}const actor=this.actors.find(a=>a.id===id);if(actor)this.focus(actor.walker.position.x,actor.walker.position.z,2.8);}
-  selectOwner(){this.selectedOwner=!this.selectedOwner;this.selectedId=null;this.selectedRoom=null;this.executive.owner.selection.visible=this.selectedOwner;this.executive.ownerLabel.classList.toggle('selected',this.selectedOwner);this.executive.ownerLabel.setAttribute('aria-pressed',String(this.selectedOwner));for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);if(this.selectedOwner)this.focus(this.executive.owner.root.position.x,this.executive.owner.root.position.z,2.8);}
-  selectRoom(key){this.selectedRoom=key;this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}for(const [k,m]of this.roomMeshes)m.material.emissive.set(k===key?'#213921':'#000000');for(const m of this.executive.floors.values())m.material.emissive.set(key==='executive'?'#172315':'#000000');const room=key==='executive'?this.layout.executive:this.layout.rooms.find(r=>r.key===key);if(room){const [x0,x1,z0,z1]=room.bounds;this.focus((x0+x1)/2,(z0+z1)/2,2.05);}}
-  focus(x,z,zoom){this.transition={from:this.viewTarget.clone(),to:new THREE.Vector3(x,0,z),zoomFrom:this.zoom,zoomTo:zoom,start:performance.now()};}
+  selectActor(id){this.selectedId=id;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.selectedRoom=null;for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=a.id===id;a.label.classList.toggle('selected',a.id===id);}const actor=this.actors.find(a=>a.id===id);if(actor)this.focusCharacter(actor.model);}
+  selectOwner(){this.selectedOwner=!this.selectedOwner;this.selectedId=null;this.selectedRoom=null;this.executive.owner.selection.visible=this.selectedOwner;this.executive.ownerLabel.classList.toggle('selected',this.selectedOwner);this.executive.ownerLabel.setAttribute('aria-pressed',String(this.selectedOwner));for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}for(const m of [...this.roomMeshes.values(),...this.executive.floors.values()])m.material.emissive.set(0);if(this.selectedOwner)this.focusCharacter(this.executive.owner);}
+  selectRoom(key){this.selectedRoom=key;this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}for(const [k,m]of this.roomMeshes)m.material.emissive.set(k===key?'#213921':'#000000');for(const m of this.executive.floors.values())m.material.emissive.set(key==='executive'?'#172315':'#000000');const room=key==='executive'?this.layout.executive:this.layout.rooms.find(r=>r.key===key);if(room){const [x0,x1,z0,z1]=room.bounds;this.focus(new THREE.Vector3((x0+x1)/2,0,(z0+z1)/2),2.05);}}
+  focusCharacter(model){
+    beginCameraOrbit(this);
+    const target=characterFocusPoint(model);
+    if(this.motion)this.focus(target,2.8,model);
+    else{
+      this.viewTarget.copy(target);
+      this.zoom=2.8;
+      this.resize();
+    }
+  }
+  focus(to,zoom,model){this.transition={from:this.viewTarget.clone(),to,zoomFrom:this.zoom,zoomTo:zoom,start:performance.now(),model};}
   resetView(){this.orbitFrame=null;this.transition=null;this.angle=.48;this.elevation=.72;this.zoom=1;this.selectedRoom=null;this.selectedId=null;this.selectedOwner=false;this.executive.owner.selection.visible=false;this.executive.ownerLabel.classList.remove('selected');this.executive.ownerLabel.setAttribute('aria-pressed','false');this.viewTarget.set(0,0,0);for(const m of [...(this.roomMeshes?.values()||[]),...this.executive.floors.values()])m.material.emissive.set(0);for(const a of this.actors){a.model.selection.visible=false;a.label.classList.remove('selected');}this.resize();}
   setElevation(degrees){this.transition=null;this.elevation=THREE.MathUtils.clamp(Number(degrees),12,89)*Math.PI/180;this.resize();}
   setZoom(value){this.transition=null;this.zoom=THREE.MathUtils.clamp(value,.65,12);this.resize();}
@@ -333,13 +343,21 @@ export class SharedOfficeScene {
   }
   frame(time){
     this.frameHandle=requestAnimationFrame(this.frame);const dt=Math.min((time-this.lastTime)/1000,.05);this.lastTime=time;if(document.hidden)return;this.updateLighting(new Date());
-    if(this.transition){const t=Math.min(1,(time-this.transition.start)/650),smooth=t*t*(3-2*t);this.viewTarget.lerpVectors(this.transition.from,this.transition.to,smooth);this.zoom=THREE.MathUtils.lerp(this.transition.zoomFrom,this.transition.zoomTo,smooth);this.resize();if(t===1)this.transition=null;}
     for(const actor of this.actors)this.updateActor(actor,dt,time);this.actors=this.actors.filter(actor=>!actor.departed);
     this.executive.update(dt,time,this.motion,this.actors);this.cat?.update(dt,time,this.motion);
     if(this.ownerStatusText!==this.executive.patrol.text){this.ownerStatusText=this.executive.patrol.text;this.onOwnerStatus?.();}
     this.visitor.update(this.navigator,dt,time,this.motion,true,this.executive.spouseTargets());
     if(this.live){const actor=this.showPaths!==false&&(this.actors.find(a=>a.id===this.selectedId&&a.walker.walking)||this.actors.find(a=>a.model.root.visible&&a.walker.walking)),signature=actor?`${actor.id}:${actor.walker.route.length}:${actor.walker.destination.x}:${actor.walker.destination.z}`:'';if(signature!==this.routeSignature){this.routeSignature=signature;if(actor)this.drawRoute(actor);else this.clearRoute();}}
-    this.updateLabels();this.renderer.render(this.scene,this.camera);
+    if(this.transition){
+      const {from,to,zoomFrom,zoomTo,start,model}=this.transition;
+      const t=THREE.MathUtils.clamp((time-start)/650,0,1),smooth=t*t*(3-2*t);
+      if(model)characterFocusPoint(model,to);
+      this.viewTarget.lerpVectors(from,to,smooth);
+      this.zoom=THREE.MathUtils.lerp(zoomFrom,zoomTo,smooth);
+      if(t===1)this.transition=null;
+      this.resize();
+    }else this.updateLabels();
+    this.renderer.render(this.scene,this.camera);
   }
   destroy(){cancelAnimationFrame(this.frameHandle);this.resizeObserver.disconnect();this.actorLabels.destroy();this.visitor.destroy(disposeCharacter);for(const actor of this.actors)disposeCharacter(actor.model);this.executive.destroy();this.cat?.dispose();this.groundDesign?.dispose();this.renderer.dispose();this.element.replaceChildren();}
 }

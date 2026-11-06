@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../public/vendor/three/three.module.js';
 import {beginCameraOrbit} from '../public/office-camera.js';
+import {OfficeNavigator} from '../public/office-navigation.js';
 
 globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},fillText(){}})})};
 const {OfficeScene}=await import('../public/office-scene.js');
@@ -86,4 +87,52 @@ test('tower overview reset restores automatic framing after orbit',()=>{
   const {view}=sceneFor(OfficeScene,{executive:true});
   beginCameraOrbit(view);view.resize();assert.ok(view.orbitFrame);
   view.resetView();assert.equal(view.orbitFrame,null);assert.equal(view.zoom,1);
+});
+
+test('tower bubble click selects the character and makes it the camera pivot',t=>{
+  const {view,handlers}=sceneFor(OfficeScene,{zoom:3});
+  const navigator=new OfficeNavigator();
+  Object.assign(view,{
+    navigator,actors:new Map(),world:new THREE.Group(),archiveRoomGroup:{},standardOuterWallsGroup:{},
+    labelLayer:{append(){}},setExecutiveOffice(){},onSelectSession(id){this.selectedId=id;},
+  });
+  t.after(()=>{delete globalThis.document;});
+  globalThis.document={createElement:()=>new EventTarget()};
+  view.setSessions([{id:'staff',projectKey:'floor',active:false}],'floor');
+  const {model,label}=view.actors.get('staff');
+  model.root.position.set(4,.32,3);
+  view.viewTarget.set(-8,0,-5);view.resize();
+  const centre=model.body.localToWorld(new THREE.Vector3(0,.8,0));
+  const span=view.camera.top-view.camera.bottom;
+  label.dispatchEvent(new Event('click'));
+  assert.equal(view.selectedId,'staff');
+  assertCentred(view,centre);
+  assert.ok(Math.abs((view.camera.top-view.camera.bottom)-span)<1e-9);
+  handlers.get('keydown')({key:'ArrowRight',preventDefault(){}});
+  assertCentred(view,centre);
+});
+
+test('shared-office selection centres the rendered character after movement during the transition',t=>{
+  const {view}=sceneFor(SharedOfficeScene);
+  const root=new THREE.Group(),body=new THREE.Group();
+  root.position.set(2,.32,5);root.add(body);
+  const label={classList:{remove(){},toggle(){}},setAttribute(){}};
+  const model={root,body,selection:{visible:false}};
+  Object.assign(view,{
+    actors:[{id:'staff',model,label}],
+    executive:{owner:{selection:{}},ownerLabel:label,floors:new Map(),update(){},patrol:{},spouseTargets(){}},
+    cats:[],visitor:{update(){}},roomMeshes:new Map(),motion:true,
+    updateLighting(){},updateActor(){root.position.x+=3;},renderer:{...view.renderer,render(){}},
+    lastTime:performance.now(),
+  });
+  t.after(()=>{delete globalThis.document;delete globalThis.requestAnimationFrame;});
+  globalThis.document={hidden:false};
+  globalThis.requestAnimationFrame=()=>1;
+
+  view.selectActor('staff');
+  view.frame(view.transition.start+651);
+
+  assert.equal(view.transition,null);
+  assert.equal(model.selection.visible,true);
+  assertCentred(view,body.localToWorld(new THREE.Vector3(0,.8,0)));
 });

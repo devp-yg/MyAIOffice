@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three/three.module.js';
-import { beginCameraOrbit, orbitHalfHeight } from './office-camera.js';
+import { beginCameraOrbit, characterFocusPoint, orbitHalfHeight } from './office-camera.js';
 import { staffAppearance } from './staff-appearance.js';
 import { OfficeOwner } from './office-owner.js';
 import { buildExecutiveSuite as buildExecutiveInterior } from './office-executive-scene.js';
@@ -439,6 +439,11 @@ export class OfficeScene {
   const points=[];for(const x of [-15.2,this.navigator.executive?8.4:12.6])for(const z of this.navigator.executive?[-7.6,7.6]:[-8.6,8.6])for(const y of [-.65,3])points.push(new THREE.Vector3(x,y,z).applyMatrix4(this.camera.matrixWorldInverse));const right=new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld,0),up=new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld,1);const xs=points.map(p=>p.x+this.viewTarget.dot(right)),ys=points.map(p=>p.y+this.viewTarget.dot(up));const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys),aspect=width/height;const halfH=this.orbitFrame?orbitHalfHeight(this,aspect):Math.max((y1-y0)/2,(x1-x0)/aspect/2)*1.035/this.zoom;const midX=this.orbitFrame?0:(x0+x1)/2,midY=this.orbitFrame?0:(y0+y1)/2;this.camera.left=midX-halfH*aspect;this.camera.right=midX+halfH*aspect;this.camera.top=midY+halfH;this.camera.bottom=midY-halfH;this.element.classList.toggle('low-angle',this.elevation<.25);this.camera.updateProjectionMatrix();this.updateLabels();this.onCameraChange?.({elevation:Math.round(this.elevation*180/Math.PI),zoom:this.zoom});
  }
  setZoom(zoom){this.zoom=THREE.MathUtils.clamp(zoom,.55,12);this.resize();}
+ focusCharacter(model){
+  beginCameraOrbit(this);
+  characterFocusPoint(model,this.viewTarget);
+  this.resize();
+ }
  resetView(){this.orbitFrame=null;this.angle=this.navigator.executive?.67:.63;this.elevation=this.navigator.executive?.8:.63;this.zoom=1;this.viewTarget.set(0,0,0);this.resize();}
  setElevation(degrees){this.elevation=THREE.MathUtils.clamp(Number(degrees),0,89)*Math.PI/180;this.resize();}
  setDirectory(floors,initial){this.executiveFloorKey=floors.reduce((top,item)=>!top||item.number>top.number?item:top,null)?.key||null;this.owner.setDirectory(floors,initial);if(!this.archiveMode)this.setExecutiveOffice(this.context===this.executiveFloorKey&&Boolean(this.executiveFloorKey));}
@@ -464,7 +469,12 @@ export class OfficeScene {
   }
   const ids=new Set(sessions.map(item=>item.id));for(const [id,actor]of this.actors){if(!ids.has(id)){actor.leaving=true;actor.walker.setDestination(this.navigator.station('desk',actor.homeSlot),'desk');}}
   const slots={};for(const session of sessions){let target=session.active?(session.room==='elevator'?(this.navigator.executive?'reception':'meeting'):ROOM_NAMES[session.room]?session.room:'desk'):'desk';if(this.navigator.executive&&session.active&&target==='studio')target='desk';else if(this.navigator.executive&&target==='desk')target='reception';let actor=this.actors.get(session.id);
-    if(!actor){const usedHomes=new Set([7,...[...this.actors.values()].filter(item=>item.session.projectKey===session.projectKey).map(item=>item.homeSlot)]);let homeSlot=0;while(usedHomes.has(homeSlot)&&homeSlot<11)homeSlot++;const model=createCharacter(this.world,session.palette||'studio',session.identity||{});model.root.userData.sessionId=session.id;const label=document.createElement('button');label.className='world-agent-label tower-agent-label';label.addEventListener('click',()=>this.onSelectSession?.(session.id));this.labelLayer.append(label);actor={model,label,walker:new OfficeWalker(this.navigator,this.navigator.station('desk',homeSlot)),homeSlot,readyAt:performance.now()+650+homeSlot*90,lastPose:'',session,leaving:false,hadRequest:session.requestId,assignmentKey:'',interaction:'primary',nextInteractionAt:performance.now()+6500+homeSlot*500};this.actors.set(session.id,actor);}
+    if(!actor){const usedHomes=new Set([7,...[...this.actors.values()].filter(item=>item.session.projectKey===session.projectKey).map(item=>item.homeSlot)]);let homeSlot=0;while(usedHomes.has(homeSlot)&&homeSlot<11)homeSlot++;const model=createCharacter(this.world,session.palette||'studio',session.identity||{});model.root.userData.sessionId=session.id;const label=document.createElement('button');label.className='world-agent-label tower-agent-label';
+      label.addEventListener('click',()=>{
+        this.onSelectSession?.(session.id);
+        this.focusCharacter(model);
+      });
+      this.labelLayer.append(label);actor={model,label,walker:new OfficeWalker(this.navigator,this.navigator.station('desk',homeSlot)),homeSlot,readyAt:performance.now()+650+homeSlot*90,lastPose:'',session,leaving:false,hadRequest:session.requestId,assignmentKey:'',interaction:'primary',nextInteractionAt:performance.now()+6500+homeSlot*500};this.actors.set(session.id,actor);}
     actor.session=session;actor.leaving=false;const slotKey=session.projectKey+target;const slot=target==='desk'?actor.homeSlot:(slots[slotKey]??0);slots[slotKey]=(slots[slotKey]??0)+1;actor.desired={point:this.navigator.station(target,slot),room:target,slot};
     const assignmentKey=`${session.projectKey}:${target}:${slot}`;
     if(actor.assignmentKey!==assignmentKey){actor.assignmentPending=true;actor.assignmentKey=assignmentKey;actor.interaction='primary';actor.nextInteractionAt=performance.now()+6500+slot*500;if(performance.now()>=actor.readyAt&&!this.isReceiving(actor))actor.walker.setDestination(actor.desired.point,target);}

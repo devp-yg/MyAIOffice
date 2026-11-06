@@ -12,7 +12,10 @@ export class OfficeOwner {
     this.walker=new OfficeWalker(office.navigator,this.homePoint());
     this.patrol=new CeoRoutine();
     this.label=document.createElement('button');this.label.className='world-agent-label owner-label show-task';this.label.innerHTML='<strong><span class="owner-label-name"></span><small class="agent-rank owner-label-rank"></small></strong><span class="owner-label-action">사무실을 살펴보는 중</span>';this.setOwnerIdentity({name:'CEO',title:'CEO',rank:'1'});
-    this.label.addEventListener('click',()=>office.onOwnerSelect?.());office.labelLayer.append(this.label);
+    this.label.addEventListener('click',()=>{
+      office.onOwnerSelect?.();
+      office.focusCharacter(this.model);
+    });office.labelLayer.append(this.label);
     this.buildLift();
   }
   setOwnerIdentity({name='CEO',title='CEO',rank='1'}={}){
